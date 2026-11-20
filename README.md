@@ -28,6 +28,21 @@ nexconn-build/
 
 ---
 
+## Quick Start (Run Everything)
+
+To start the database check/seed, the Express backend, and the Vite frontend all in one command:
+
+```bash
+npm start
+# or: npm run dev
+```
+
+- **Frontend**: http://localhost:5173
+- **Backend API**: http://localhost:4000
+- **Database**: PostgreSQL on `localhost:5432/rehearsal`
+
+---
+
 ## 1. Setup & Installation
 
 All required dependencies have been installed and tested. If you need to re-install at any point:

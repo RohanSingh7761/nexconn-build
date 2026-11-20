@@ -23,7 +23,7 @@ export default function Bubble({ message }) {
         <div className={`bubble bubble--${isLearner ? 'learner' : 'persona'}`}>
           {message.content}
         </div>
-        <time className="bubble-time" dateTime={new Date(message.createdAt ?? Date.now()).toISOString()}>
+        <time className="bubble-time" dateTime={message.createdAt ? new Date(message.createdAt).toISOString() : undefined}>
           {formatTime(message.createdAt)}
         </time>
       </div>

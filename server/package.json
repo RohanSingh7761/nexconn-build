@@ -1,4 +1,12 @@
 {
+  "name": "rehearsal-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "spike": "tsx src/spike.ts"
+  },
   "dependencies": {
     "@nexconn/server-sdk": "github:NexconnAI-Dev/nexconn-server-sdk-node#v0.1.2",
     "bcryptjs": "^3.0.3",

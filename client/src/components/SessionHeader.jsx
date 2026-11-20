@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Timer, UserPlus, Square, Wifi, WifiOff, ChevronDown } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { UserPlus, Square, WifiOff } from 'lucide-react'
 
 function pad(n) {
   return String(n).padStart(2, '0')
@@ -20,15 +20,13 @@ export default function SessionHeader({
   onInvite,
   onFinish,
 }) {
-  const [elapsed, setElapsed] = useState(0)
-  const ref = useRef(null)
-
+  const [mountedAt] = useState(Date.now)
+  const [now, setNow] = useState(Date.now)
   useEffect(() => {
-    const base = startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0
-    setElapsed(base)
-    ref.current = setInterval(() => setElapsed(e => e + 1), 1000)
-    return () => clearInterval(ref.current)
-  }, [startedAt])
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
+  const elapsed = Math.max(0, Math.floor((now - (startedAt ?? mountedAt)) / 1000))
 
   const initials = personaName
     .split(' ')

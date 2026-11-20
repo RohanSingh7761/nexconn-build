@@ -33,6 +33,8 @@ const DEMO_SCENE = [
   },
 ]
 
+const DEMO_STARTED_AT = Date.now() - 95000
+
 const DEMO_TIPS = [
   {
     uid: 'c1',
@@ -69,7 +71,7 @@ export default function SessionScreen({
   const personaName    = scenario?.personaName    ?? 'Alex Marsh'
   const personaRole    = scenario?.personaRole    ?? 'Hiring Manager'
   const difficulty     = session?.difficulty      ?? 'neutral'
-  const startedAt      = session?.startedAt       ?? (Date.now() - 95000)
+  const startedAt      = session?.startedAt       ?? DEMO_STARTED_AT
   const inviteCode     = session?.inviteCode
   const inviteExpiry   = session?.inviteExpiry
 
@@ -81,16 +83,14 @@ export default function SessionScreen({
   const [pillTip, setPillTip] = useState(null)
   const prevCoachLen = useRef(coachMessages.length)
   useEffect(() => {
-    if (coachMessages.length > prevCoachLen.current && activeTab !== 'coach') {
-      const last = coachMessages[coachMessages.length - 1]
-      if (last?.kind === 'coach_tip') {
-        setPillTip(last)
-        const t = setTimeout(() => setPillTip(null), 5000)
-        return () => clearTimeout(t)
-      }
-    }
+    const grew = coachMessages.length > prevCoachLen.current
     prevCoachLen.current = coachMessages.length
-  }, [coachMessages.length, activeTab])
+    const last = coachMessages[coachMessages.length - 1]
+    if (!grew || activeTab === 'coach' || last?.kind !== 'coach_tip') return
+    setPillTip(last) // eslint-disable-line react/set-state-in-effect -- reacting to a new incoming tip
+    const t = setTimeout(() => setPillTip(null), 5000)
+    return () => clearTimeout(t)
+  }, [coachMessages, activeTab])
 
   const handleInviteClick = useCallback(() => {
     onInvite?.()

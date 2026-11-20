@@ -8,6 +8,8 @@ import {
   DirectChannelIdentifier,
   GroupChannelIdentifier,
   BaseChannel,
+  ChannelType,
+  ConnectionStatus,
 } from '@nexconn/chat';
 
 /**
@@ -23,138 +25,127 @@ import {
  * @property {number} sentAt
  */
 
+const TOKEN_ERRORS = [31004, 31020]; // RC_CONN_TOKEN_INCORRECT, RC_CONN_TOKEN_EXPIRED
+
 let initialized = false;
 
-export function init(appKey) {
+/**
+ * @param {string} appKey
+ * @param {number} [areaCode] AreaCode from @nexconn/chat (SG default, NA = 3). Must match the console app's data center.
+ */
+export function init(appKey, areaCode) {
   if (initialized) return;
-  NCEngine.initialize({ appKey });
+  NCEngine.initialize(areaCode ? { appKey, areaCode } : { appKey });
   initialized = true;
 }
 
+/** Resolves with { userId } when connected; throws with .code on failure. */
 export async function connect(token) {
-  return await NCEngine.connect(token);
+  const res = await NCEngine.connect({ token });
+  if (!res.isOk) {
+    const err = new Error(`Nexconn connect failed: ${res.code} ${res.msg}`);
+    err.code = res.code;
+    err.tokenExpired = TOKEN_ERRORS.includes(res.code);
+    throw err;
+  }
+  return res.data;
 }
 
 export function disconnect() {
-  NCEngine.disconnect();
+  return NCEngine.disconnect();
 }
 
+function toRef(identifier) {
+  return {
+    type: identifier?.channelType === ChannelType.GROUP ? 'group' : 'direct',
+    targetId: identifier?.channelId,
+  };
+}
+
+function toIncoming(m, channel) {
+  const c = m.content;
+  return {
+    uid: m.messageId,
+    channel: channel || toRef(m.channelIdentifier),
+    senderId: m.senderUserId,
+    text: typeof c === 'string' ? c : c?.content ?? '',
+    sentAt: m.sentTime || Date.now(),
+  };
+}
+
+function channelOf(ref) {
+  return ref.type === 'group' ? new GroupChannel(ref.targetId) : new DirectChannel(ref.targetId);
+}
+
+const newId = (p) => p + Math.random().toString(36).slice(2, 9);
+
 /**
- * Subscribes to incoming messages.
  * @param {(msg: IncomingMessage) => void} cb
- * @returns {() => void} unsubscribe function
+ * @returns {() => void} unsubscribe
  */
 export function onMessage(cb) {
-  const handlerId = 'handler_' + Math.random().toString(36).substring(2, 9);
-  const handler = new MessageHandler({
+  const id = newId('msg_');
+  NCEngine.addMessageHandler(id, new MessageHandler({
     onMessageReceived({ messages }) {
-      for (const m of messages) {
-        const text = m.content?.content || (typeof m.content === 'string' ? m.content : '');
-        const isGroup = m.channelIdentifier?.channelType === 2; // Group
-        cb({
-          uid: m.messageId,
-          channel: {
-            type: isGroup ? 'group' : 'direct',
-            targetId: m.channelIdentifier?.channelId,
-          },
-          senderId: m.senderUserId,
-          text,
-          sentAt: m.sentTime || Date.now(),
-        });
-      }
+      for (const m of messages) cb(toIncoming(m));
     },
-  });
-
-  NCEngine.addMessageHandler(handlerId, handler);
-  return () => {
-    NCEngine.removeMessageHandler(handlerId);
-  };
+  }));
+  return () => NCEngine.removeMessageHandler(id);
 }
 
 /**
- * Subscribes to connection status changes.
- * @param {(status: string, code?: number) => void} cb
- * @returns {() => void} unsubscribe function
+ * @param {(status: 'connected'|'connecting'|'disconnected'|'token_expired', code?: number) => void} cb
+ * @returns {() => void} unsubscribe
  */
 export function onConnectionStatus(cb) {
-  const handlerId = 'conn_' + Math.random().toString(36).substring(2, 9);
-  const handler = new ConnectionStatusHandler({
-    onConnectionStatusChanged(event) {
-      cb(event.status, event.code);
+  const id = newId('conn_');
+  NCEngine.addConnectionStatusHandler(id, new ConnectionStatusHandler({
+    onConnectionStatusChanged({ status, code }) {
+      if (TOKEN_ERRORS.includes(code)) return cb('token_expired', code);
+      if (status === ConnectionStatus.CONNECTED) return cb('connected', code);
+      if (status === ConnectionStatus.CONNECTING) return cb('connecting', code);
+      cb('disconnected', code); // DISCONNECTED or SUSPENDED (SDK keeps retrying on SUSPENDED)
     },
-  });
-
-  NCEngine.addConnectionStatusHandler(handlerId, handler);
-  return () => {
-    NCEngine.removeConnectionStatusHandler(handlerId);
-  };
+  }));
+  return () => NCEngine.removeConnectionStatusHandler(id);
 }
 
 /**
- * Send text message to channel.
  * @param {ChannelRef} channel
  * @param {string} text
  * @returns {Promise<{ uid: string }>}
  */
 export async function sendText(channel, text) {
-  const chan = channel.type === 'group'
-    ? new GroupChannel(channel.targetId)
-    : new DirectChannel(channel.targetId);
-
-  const params = new SendTextMessageParams({ content: text });
-  const result = await chan.sendMessage(params);
-  return { uid: result?.messageId || result?.data?.messageId };
+  const res = await channelOf(channel).sendMessage(new SendTextMessageParams({ content: text }));
+  if (!res.isOk) throw new Error(`Nexconn send failed: ${res.code} ${res.msg}`);
+  return { uid: res.data.messageId };
 }
 
 /**
- * Fetches message history for a channel.
+ * Newest-first page of history.
  * @param {ChannelRef} channel
- * @param {{ limit?: number }} options
+ * @param {{ limit?: number, before?: number }} options before = sentTime to page back from
  * @returns {Promise<IncomingMessage[]>}
  */
-export async function getHistory(channel, { limit = 20 } = {}) {
-  const identifier = channel.type === 'group'
+export async function getHistory(channel, { limit = 20, before } = {}) {
+  const channelIdentifier = channel.type === 'group'
     ? new GroupChannelIdentifier(channel.targetId)
     : new DirectChannelIdentifier(channel.targetId);
-
   const query = BaseChannel.createMessagesQuery({
-    channelIdentifier: identifier,
+    channelIdentifier,
     pageSize: limit,
+    ...(before ? { startTime: before } : {}),
   });
-
   const res = await query.loadNextPage();
-  if (res && res.isOk && Array.isArray(res.data)) {
-    return res.data.map(m => ({
-      uid: m.messageId,
-      channel,
-      senderId: m.senderUserId,
-      text: m.content?.content || (typeof m.content === 'string' ? m.content : ''),
-      sentAt: m.sentTime || Date.now(),
-    }));
-  }
-  return [];
+  if (!res.isOk) throw new Error(`Nexconn history failed: ${res.code} ${res.msg}`);
+  return (res.data?.data || []).map((m) => toIncoming(m, channel));
 }
 
-/**
- * Optional unread count query
- * @param {ChannelRef} channel
- */
+/** shortcut: reads the SDK's cached count on a fresh channel object; may be 0 until channels are loaded. */
 export async function getUnreadCount(channel) {
-  const chan = channel.type === 'group'
-    ? new GroupChannel(channel.targetId)
-    : new DirectChannel(channel.targetId);
-  return chan.unreadCount || 0;
+  return channelOf(channel).unreadCount || 0;
 }
 
-/**
- * Optional typing status sender
- * @param {ChannelRef} channel
- */
 export async function sendTyping(channel) {
-  if (channel.type === 'direct') {
-    const chan = new DirectChannel(channel.targetId);
-    if (typeof chan.sendTypingStatus === 'function') {
-      return await chan.sendTypingStatus(1);
-    }
-  }
+  return channelOf(channel).sendTypingStatus('RC:TxtMsg');
 }

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Rehearsal</string>
+    <string name="title_activity_main">Rehearsal</string>
+    <string name="package_name">com.rehearsal.app</string>
+    <string name="custom_url_scheme">com.rehearsal.app</string>
+</resources>

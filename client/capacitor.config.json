@@ -1,0 +1,7 @@
+{
+  "appId": "com.rehearsal.app",
+  "appName": "Rehearsal",
+  "webDir": "dist",
+  "server": { "androidScheme": "https" },
+  "plugins": { "Keyboard": { "resize": "body" } }
+}

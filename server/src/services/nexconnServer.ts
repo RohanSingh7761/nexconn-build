@@ -16,10 +16,15 @@ let usersApi: UserManagementApi | null = null;
 let messagesApi: MessageManagementApi | null = null;
 let groupsApi: GroupChannelManagementApi | null = null;
 
+function ensureUrl(urlOrDomain: string): string {
+  if (!urlOrDomain) return urlOrDomain;
+  return /^https?:\/\//i.test(urlOrDomain) ? urlOrDomain : `https://${urlOrDomain}`;
+}
+
 export function initNexconnServer(config: NexconnServerConfig) {
   const cfg = new Configuration();
   cfg.setNexconnCredentials(config.appKey, config.appSecret);
-  cfg.setPrimaryBackupDomains(config.primaryDomain, config.secondaryDomain);
+  cfg.setPrimaryBackupDomains(ensureUrl(config.primaryDomain), ensureUrl(config.secondaryDomain));
 
   usersApi = new UserManagementApi(cfg);
   messagesApi = new MessageManagementApi(cfg);

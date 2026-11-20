@@ -1,0 +1,80 @@
+/* Hallmark · Console · graphite · theme: Console (inferred: AI tool, professional rehearsal chat) · genre: modern-minimal · v2.0.0 */
+/* pre-emit critique: P4 H5 E5 S4 R5 V4 · weakest: S, app screen tied to persona/coach split which is specific but pattern is session-window; led with the two-colour meaning system (amber=person, cool=instrument) as the signature read */
+
+/* Floor rules: overflow-x clip on html+body, no 100vw, tokens only, no transition: all */
+
+:root {
+  /* Console graphite palette */
+  --color-paper:        oklch(17% 0.008 250);
+  --color-paper-2:      oklch(21% 0.009 250);
+  --color-paper-3:      oklch(13.5% 0.007 250);
+
+  --color-ink:          oklch(95% 0.005 250);
+  --color-ink-2:        oklch(83% 0.008 250);
+  --color-muted:        oklch(71% 0.01 250);
+
+  --color-rule:         oklch(31% 0.01 250);
+  --color-rule-2:       oklch(42% 0.012 250);
+
+  /* amber = a person (learner, mentor, you) */
+  --color-accent:       oklch(82% 0.15 80);
+  --color-accent-ink:   oklch(18% 0.04 75);
+  --color-accent-soft:  oklch(29% 0.05 80);
+  --color-focus:        oklch(82% 0.15 80);
+
+  /* cool = an instrument (AI persona, AI coach) */
+  --color-cool:         oklch(77% 0.12 245);
+  --color-cool-soft:    oklch(29% 0.05 245);
+
+  /* status */
+  --color-ok:           oklch(76% 0.15 150);
+  --color-ok-soft:      oklch(24.5% 0.03 150);
+  --color-bad:          oklch(70% 0.17 25);
+  --color-bad-soft:     oklch(24.5% 0.035 25);
+
+  /* typography */
+  --font-display:  "Host Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-body:     var(--font-display);
+  --font-outlier:  "Atkinson Hyperlegible Mono", ui-monospace, monospace;
+
+  /* radius */
+  --radius-card:   10px;
+  --radius-pill:   6px;
+
+  /* rules */
+  --rule-hair:     1px;
+
+  /* spacing scale */
+  --space-2xs:  2px;
+  --space-xs:   4px;
+  --space-sm:   8px;
+  --space-md:  16px;
+  --space-lg:  24px;
+  --space-xl:  40px;
+  --space-2xl: 64px;
+
+  /* type scale */
+  --text-xs:      0.75rem;   /* 12px */
+  --text-sm:      0.875rem;  /* 14px */
+  --text-base:    1rem;      /* 16px */
+  --text-lg:      1.125rem;  /* 18px */
+  --text-title:   1.25rem;   /* 20px */
+  --text-section: 1.5rem;    /* 24px */
+  --text-display: 2rem;      /* 32px */
+
+  /* motion */
+  --dur-short:  120ms;
+  --dur-mid:    220ms;
+  --ease-out:   cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* z-index */
+  --z-sticky-nav:  100;
+  --z-sticky:       50;
+  --z-pill:        200;
+  --z-sheet:       300;
+
+  /* layout */
+  --header-h:   52px;
+  --composer-h: 64px;
+  --panel-w:    38%;   /* coach panel desktop */
+}

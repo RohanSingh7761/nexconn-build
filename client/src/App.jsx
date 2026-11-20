@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import * as api from './lib/api'
 import * as nx from './lib/nexconn'
 import SessionScreen from './components/SessionScreen'
@@ -19,6 +19,7 @@ export default function App() {
   const [sceneMessages, setSceneMessages] = useState([])
   const [coachMessages, setCoachMessages] = useState([])
   const [pendingTurn, setPendingTurn] = useState(false)
+  const [isFinishing, setIsFinishing] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState('disconnected')
   const [inviteCode, setInviteCode] = useState(null)
   const [inviteExpiry, setInviteExpiry] = useState(null)
@@ -62,15 +63,22 @@ export default function App() {
         unsubMsg = nx.onMessage((m) => {
           // If message is in scene channel
           if (m.channel.targetId === channels.scene.targetId) {
+            const text = (m.text || '').trim()
+            if (!text) return // Prevent empty bubbles
+
             setSceneMessages((prev) => {
-              if (prev.some((x) => x.uid === m.uid)) return prev
+              // Deduplicate on UID or exact content & sender
+              const senderType = m.senderId === user.nexconnUserId ? 'learner' : 'persona'
+              if (prev.some((x) => x.uid === m.uid || (x.content === text && x.senderType === senderType))) {
+                return prev
+              }
               return [
                 ...prev,
                 {
                   uid: m.uid,
-                  senderType: m.senderId === user.nexconnUserId ? 'learner' : 'persona',
-                  senderName: m.senderId === user.nexconnUserId ? 'You' : (scenario?.persona_name || 'Persona'),
-                  content: m.text,
+                  senderType,
+                  senderName: senderType === 'learner' ? 'You' : (scenario?.persona_name || 'Persona'),
+                  content: text,
                   createdAt: m.sentAt,
                 },
               ]
@@ -81,13 +89,21 @@ export default function App() {
           if (m.channel.targetId === channels.coach.targetId) {
             let parsed = null
             try {
-              parsed = JSON.parse(m.text)
+              parsed = typeof m.text === 'string' ? JSON.parse(m.text) : m.text
+              if (parsed && typeof parsed.content === 'string') {
+                try {
+                  parsed = JSON.parse(parsed.content)
+                } catch {}
+              }
             } catch {
               parsed = { text: m.text, kind: 'coach_tip' }
             }
 
+            const tipText = (parsed.text || parsed.tip || parsed.advice || m.text || '').trim()
+            if (!tipText) return // Prevent empty boxes
+
             setCoachMessages((prev) => {
-              if (prev.some((x) => x.uid === m.uid)) return prev
+              if (prev.some((x) => x.uid === m.uid || (x.text && x.text === tipText))) return prev
               return [
                 ...prev,
                 {
@@ -95,7 +111,7 @@ export default function App() {
                   kind: parsed.kind || 'coach_tip',
                   category: parsed.category || 'clarity',
                   sentiment: parsed.sentiment || 'neutral',
-                  text: parsed.text || m.text,
+                  text: tipText,
                   rewrite: parsed.rewrite || null,
                   senderName: m.senderId === 'bot_coach' ? 'Coach (AI)' : 'Mentor',
                   createdAt: m.sentAt,
@@ -128,14 +144,15 @@ export default function App() {
     setChannels(newChannels)
     setScorecard(null)
     setShowScorecard(false)
+    setIsFinishing(false)
 
     const initialScene = []
-    if (openingMessage) {
+    if (openingMessage && openingMessage.content && openingMessage.content.trim()) {
       initialScene.push({
         uid: openingMessage.nexconn_message_uid || String(openingMessage.id),
         senderType: 'persona',
         senderName: newScenario.persona_name,
-        content: openingMessage.content,
+        content: openingMessage.content.trim(),
         createdAt: new Date(openingMessage.created_at).getTime(),
       })
     }
@@ -159,15 +176,14 @@ export default function App() {
         scene: { type: 'direct', targetId: sess.persona_nexconn_id },
         coach: { type: 'group', targetId: coachGroupId },
       })
-      // Load transcript from Postgres
       const { messages } = await api.getTranscript(sessionId)
       const sceneMsgs = messages
-        .filter((m) => m.channel === 'scene')
+        .filter((m) => m.channel === 'scene' && m.content && m.content.trim())
         .map((m) => ({
           uid: m.nexconn_message_uid || String(m.id),
           senderType: m.sender_type,
           senderName: m.sender_type === 'learner' ? 'Learner' : sc.persona_name,
-          content: m.content,
+          content: m.content.trim(),
           createdAt: new Date(m.created_at).getTime(),
         }))
       setSceneMessages(sceneMsgs)
@@ -178,13 +194,13 @@ export default function App() {
 
   // Learner sends a scene turn
   const handleSendSceneMessage = async (text) => {
-    if (!session || !channels || pendingTurn) return
+    const trimmed = text.trim()
+    if (!session || !channels || pendingTurn || !trimmed) return
     setPendingTurn(true)
 
     let uid = null
     try {
-      // 1. Send via Nexconn SDK immediately
-      const delivery = await nx.sendText(channels.scene, text)
+      const delivery = await nx.sendText(channels.scene, trimmed)
       uid = delivery.uid
     } catch (err) {
       console.warn('Nexconn client send fallback:', err.message)
@@ -195,50 +211,54 @@ export default function App() {
       uid: uid || `local-${Date.now()}`,
       senderType: 'learner',
       senderName: 'You',
-      content: text,
+      content: trimmed,
       createdAt: Date.now(),
     }
     setSceneMessages((prev) => [...prev, localMsg])
 
     try {
-      // 2. Call backend /turns (runs Persona LLM + Coach LLM in parallel)
-      const res = await api.sendTurn(session.id, text, uid)
+      // Call backend /turns (runs Persona LLM + Coach LLM in parallel)
+      const res = await api.sendTurn(session.id, trimmed, uid)
 
-      // Fallback: If Nexconn delivery didn't push it into onMessage yet, append persona reply
-      if (res.persona) {
+      // Fallback: If persona reply is present and non-empty
+      if (res.persona && res.persona.text && res.persona.text.trim()) {
+        const personaText = res.persona.text.trim()
         setSceneMessages((prev) => {
-          if (prev.some((x) => x.content === res.persona.text && x.senderType === 'persona')) return prev
+          if (prev.some((x) => x.content === personaText && x.senderType === 'persona')) return prev
           return [
             ...prev,
             {
               uid: `p-${res.persona.messageId}`,
               senderType: 'persona',
               senderName: scenario?.persona_name || 'Persona',
-              content: res.persona.text,
+              content: personaText,
               createdAt: Date.now(),
             },
           ]
         })
       }
 
-      // Fallback: append coach tip if returned
-      if (res.coach) {
-        setCoachMessages((prev) => {
-          if (prev.some((x) => x.text === res.coach.text)) return prev
-          return [
-            ...prev,
-            {
-              uid: `c-${res.coach.messageId}`,
-              kind: 'coach_tip',
-              category: res.coach.category,
-              sentiment: res.coach.sentiment,
-              text: res.coach.text,
-              rewrite: res.coach.rewrite,
-              senderName: 'Coach (AI)',
-              createdAt: Date.now(),
-            },
-          ]
-        })
+      // Fallback: If coach tip is present and non-empty
+      if (res.coach && (res.coach.text || res.coach.tip)) {
+        const coachText = (res.coach.text || res.coach.tip || '').trim()
+        if (coachText) {
+          setCoachMessages((prev) => {
+            if (prev.some((x) => x.text === coachText)) return prev
+            return [
+              ...prev,
+              {
+                uid: `c-${res.coach.messageId}`,
+                kind: 'coach_tip',
+                category: res.coach.category || 'clarity',
+                sentiment: res.coach.sentiment || 'improve',
+                text: coachText,
+                rewrite: res.coach.rewrite || null,
+                senderName: 'Coach (AI)',
+                createdAt: Date.now(),
+              },
+            ]
+          })
+        }
       }
     } catch (err) {
       console.error('Turn error:', err)
@@ -249,10 +269,12 @@ export default function App() {
 
   // Learner asks coach a question in Coach channel
   const handleAskCoach = async (text) => {
-    if (!session || !channels) return
+    const trimmed = text.trim()
+    if (!session || !channels || !trimmed) return
+
     let uid = null
     try {
-      const delivery = await nx.sendText(channels.coach, text)
+      const delivery = await nx.sendText(channels.coach, trimmed)
       uid = delivery.uid
     } catch (err) {
       console.warn('Nexconn coach send warn:', err)
@@ -263,14 +285,14 @@ export default function App() {
       {
         uid: uid || `local-coach-${Date.now()}`,
         kind: 'coach_question',
-        text,
+        text: trimmed,
         senderName: 'You',
         createdAt: Date.now(),
       },
     ])
 
     try {
-      const res = await api.sendCoachMessage(session.id, text, uid)
+      const res = await api.sendCoachMessage(session.id, trimmed, uid)
       if (res.coachReply) {
         let parsed = null
         try {
@@ -278,16 +300,19 @@ export default function App() {
         } catch {
           parsed = { text: res.coachReply.content }
         }
-        setCoachMessages((prev) => [
-          ...prev,
-          {
-            uid: `ans-${res.coachReply.messageId}`,
-            kind: 'coach_answer',
-            text: parsed.text || res.coachReply.content,
-            senderName: 'Coach (AI)',
-            createdAt: Date.now(),
-          },
-        ])
+        const answer = (parsed.text || res.coachReply.content || '').trim()
+        if (answer) {
+          setCoachMessages((prev) => [
+            ...prev,
+            {
+              uid: `ans-${res.coachReply.messageId}`,
+              kind: 'coach_answer',
+              text: answer,
+              senderName: 'Coach (AI)',
+              createdAt: Date.now(),
+            },
+          ])
+        }
       }
     } catch (err) {
       console.error('Coach message error:', err)
@@ -296,13 +321,35 @@ export default function App() {
 
   // End session & show scorecard
   const handleFinish = async () => {
-    if (!session) return
+    if (!session || isFinishing) return
+
+    // Issue #4: If user has not sent any message, confirm exit without scorecard
+    const learnerMsgs = sceneMessages.filter((m) => m.senderType === 'learner')
+    if (learnerMsgs.length === 0) {
+      const shouldExit = window.confirm(
+        'You have not sent any messages in this rehearsal yet.\n\nExit now without generating a scorecard?'
+      )
+      if (shouldExit) {
+        setSession(null)
+      }
+      return
+    }
+
+    // Issue #3: Instant visual feedback with loading state
+    setIsFinishing(true)
     try {
       const res = await api.endSession(session.id)
-      setScorecard(res.scorecard)
-      setShowScorecard(true)
+      if (res.scorecard) {
+        setScorecard(res.scorecard)
+        setShowScorecard(true)
+      } else {
+        alert(res.message || 'Session ended.')
+        setSession(null)
+      }
     } catch (err) {
       alert(`Could not finish session: ${err.message}`)
+    } finally {
+      setIsFinishing(false)
     }
   }
 
@@ -312,7 +359,8 @@ export default function App() {
     try {
       const res = await api.createInvite(session.id)
       setInviteCode(res.code)
-      setInviteExpiry(new Date(res.expiresAt).toLocaleTimeString())
+      // Save raw ISO timestamp to prevent Invalid Date crashes
+      setInviteExpiry(res.expiresAt)
     } catch (err) {
       console.error('Invite create error:', err)
     }
@@ -372,6 +420,7 @@ export default function App() {
           sceneMessages,
           coachMessages,
           pendingTurn,
+          isFinishing,
           startedAt: new Date(session.started_at).getTime(),
           inviteCode,
           inviteExpiry,

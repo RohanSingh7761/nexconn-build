@@ -48,16 +48,25 @@ export default function InviteSheet({ code = 'AB3K7P', expiresAt, onClose }) {
 
         <div
           className="sheet__code"
-          aria-label={`Invite code: ${code.split('').join(' ')}`}
+          aria-label={`Invite code: ${code ? code.split('').join(' ') : 'Generating...'}`}
         >
-          {code}
+          {code || 'Generating...'}
         </div>
 
         <p className="sheet__note">
           Share this code with your mentor. They can enter it on the join page to access the coach channel alongside this session.
-          {expiresAt && (
-            <> Code expires at <time dateTime={new Date(expiresAt).toISOString()}>{new Date(expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>.</>
-          )}
+          {(() => {
+            if (!expiresAt) return null;
+            try {
+              const d = new Date(expiresAt);
+              if (isNaN(d.getTime())) return null;
+              return (
+                <> Code expires at <time dateTime={d.toISOString()}>{d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>.</>
+              );
+            } catch {
+              return null;
+            }
+          })()}
         </p>
 
         <div className="sheet__actions">

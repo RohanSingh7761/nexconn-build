@@ -14,6 +14,14 @@ const sentimentMap = {
 }
 
 export default function TipCard({ tip }) {
+  if (!tip || (!tip.text && !tip.rewrite)) {
+    return null
+  }
+  const tipText = (tip.text || '').trim()
+  if (!tipText && !tip.rewrite) {
+    return null
+  }
+
   /* plain-text fallback if tip.kind is not coach_tip */
   if (!tip.kind || tip.kind === 'system_notice') {
     return (

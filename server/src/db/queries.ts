@@ -87,6 +87,50 @@ export async function getScenarioById(id: string): Promise<ScenarioRow | null> {
   return rows[0] || null;
 }
 
+export async function createScenario(data: {
+  id: string;
+  title: string;
+  category: string;
+  description: string;
+  learner_objective: string;
+  persona_name: string;
+  persona_role: string;
+  persona_avatar_url?: string | null;
+  persona_public_brief: string;
+  persona_private_brief: string;
+  opening_message?: string | null;
+  difficulty_guides: Record<string, string>;
+  rubric: Array<{ key: string; label: string; weight: number }>;
+  est_minutes?: number;
+}): Promise<ScenarioRow> {
+  const { rows } = await pool.query<ScenarioRow>(
+    `INSERT INTO scenarios (
+       id, title, category, description, learner_objective,
+       persona_name, persona_role, persona_avatar_url,
+       persona_public_brief, persona_private_brief,
+       opening_message, difficulty_guides, rubric, est_minutes, is_active
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, true)
+     RETURNING *`,
+    [
+      data.id,
+      data.title,
+      data.category || 'custom',
+      data.description,
+      data.learner_objective,
+      data.persona_name,
+      data.persona_role,
+      data.persona_avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(data.persona_name)}&background=random`,
+      data.persona_public_brief,
+      data.persona_private_brief,
+      data.opening_message || null,
+      JSON.stringify(data.difficulty_guides),
+      JSON.stringify(data.rubric),
+      data.est_minutes || 8,
+    ]
+  );
+  return rows[0];
+}
+
 export interface SessionRow {
   id: string;
   user_id: string;

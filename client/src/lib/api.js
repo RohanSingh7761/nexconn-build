@@ -74,6 +74,13 @@ export async function getScenario(id) {
   return request(`/scenarios/${id}`);
 }
 
+export async function createCustomScenario(situation) {
+  return request('/scenarios/custom', {
+    method: 'POST',
+    body: JSON.stringify({ situation }),
+  });
+}
+
 export async function createSession(scenarioId, difficulty = 'neutral', userContext = '') {
   return request('/sessions', {
     method: 'POST',

@@ -17,6 +17,7 @@ import {
   generateCoachTip,
   generateCoachAnswer,
   generateScorecard,
+  generateCustomScenario,
 } from './services/llm.js';
 import * as db from './db/queries.js';
 
@@ -209,6 +210,24 @@ app.get('/api/scenarios/:id', async (req: Request, res: Response) => {
       res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Scenario not found' } });
       return;
     }
+    const { persona_private_brief, ...safeScenario } = scenario;
+    res.json({ scenario: safeScenario });
+  } catch (err: any) {
+    res.status(500).json({ error: { code: 'SERVER_ERROR', message: err.message } });
+  }
+});
+
+app.post('/api/scenarios/custom', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { situation } = req.body;
+    if (!situation || typeof situation !== 'string' || !situation.trim()) {
+      res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'Situation description required' } });
+      return;
+    }
+
+    const generated = await generateCustomScenario(situation.trim());
+    const scenario = await db.createScenario(generated);
+
     const { persona_private_brief, ...safeScenario } = scenario;
     res.json({ scenario: safeScenario });
   } catch (err: any) {
@@ -521,6 +540,16 @@ app.post('/api/sessions/:id/end', requireAuth, async (req: AuthenticatedRequest,
     await db.updateSessionEnd(session.id);
     const scenario = await db.getScenarioById(session.scenario_id);
     const messages = await db.getSessionMessages(session.id);
+
+    const learnerMessages = messages.filter((m) => m.sender_type === 'learner');
+    if (learnerMessages.length === 0) {
+      res.json({
+        session: { ...session, status: 'completed' },
+        scorecard: null,
+        message: 'No messages were sent in this session. No scorecard was generated.',
+      });
+      return;
+    }
 
     let scorecard = await db.getScorecard(session.id);
     if (!scorecard && scenario) {

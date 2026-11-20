@@ -62,13 +62,29 @@ function toRef(identifier) {
   };
 }
 
+function extractText(c) {
+  if (!c) return '';
+  if (typeof c === 'string') {
+    try {
+      const parsed = JSON.parse(c);
+      if (typeof parsed === 'string') return parsed;
+      if (parsed && typeof parsed === 'object') {
+        return parsed.text ?? parsed.content ?? c;
+      }
+      return c;
+    } catch {
+      return c;
+    }
+  }
+  return c.text ?? c.content ?? '';
+}
+
 function toIncoming(m, channel) {
-  const c = m.content;
   return {
     uid: m.messageId,
     channel: channel || toRef(m.channelIdentifier),
     senderId: m.senderUserId,
-    text: typeof c === 'string' ? c : c?.content ?? '',
+    text: extractText(m.content),
     sentAt: m.sentTime || Date.now(),
   };
 }
@@ -116,7 +132,7 @@ export function onConnectionStatus(cb) {
  * @returns {Promise<{ uid: string }>}
  */
 export async function sendText(channel, text) {
-  const res = await channelOf(channel).sendMessage(new SendTextMessageParams({ content: text }));
+  const res = await channelOf(channel).sendMessage(new SendTextMessageParams({ text, content: text }));
   if (!res.isOk) throw new Error(`Nexconn send failed: ${res.code} ${res.msg}`);
   return { uid: res.data.messageId };
 }

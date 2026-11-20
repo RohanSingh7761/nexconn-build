@@ -5,6 +5,9 @@ function formatTime(ts) {
 }
 
 export default function Bubble({ message }) {
+  if (!message || !message.content || !message.content.trim()) {
+    return null
+  }
   const isLearner = message.senderType === 'learner'
 
   return (

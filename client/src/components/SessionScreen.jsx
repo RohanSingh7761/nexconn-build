@@ -110,6 +110,7 @@ export default function SessionScreen({
           difficulty={difficulty}
           connectionStatus={connectionStatus}
           startedAt={startedAt}
+          isFinishing={session?.isFinishing}
           onInvite={handleInviteClick}
           onFinish={handleFinish}
         />
@@ -206,6 +207,25 @@ export default function SessionScreen({
           expiresAt={inviteExpiry}
           onClose={() => setShowInvite(false)}
         />
+      )}
+
+      {/* Finishing analysis overlay */}
+      {session?.isFinishing && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
+          zIndex: 9999, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 14, color: '#f0f6fc',
+          fontFamily: 'system-ui, sans-serif'
+        }}>
+          <div style={{
+            width: 44, height: 44, border: '3px solid #30363d', borderTopColor: '#58a6ff',
+            borderRadius: '50%', animation: 'spin 1s linear infinite'
+          }} />
+          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Evaluating Your Rehearsal...</h3>
+          <p style={{ margin: 0, fontSize: 13, color: '#8b949e' }}>
+            Analyzing conversation transcript and generating your AI scorecard...
+          </p>
+        </div>
       )}
     </>
   )

@@ -65,6 +65,7 @@ function parseJSON<T>(text: string, fallback: T): T {
 
 export interface ScenarioMeta {
   title: string;
+  category: string;
   description: string;
   learner_objective: string;
   persona_name: string;
@@ -178,14 +179,85 @@ Return JSON ONLY in this format:
     return null;
   }
 
+  const tipText = (parsed.tip || parsed.text || parsed.advice || parsed.feedback || '').trim();
+  if (!tipText) {
+    return null;
+  }
+
   return {
     skip: false,
     kind: 'coach_tip',
     category: parsed.category || 'clarity',
     sentiment: parsed.sentiment || 'improve',
-    text: parsed.tip || 'Be specific with examples to strengthen your point.',
-    rewrite: parsed.rewrite || null,
+    text: tipText,
+    rewrite: parsed.rewrite?.trim() || null,
   };
+}
+
+export async function generateCustomScenario(situation: string): Promise<ScenarioMeta & { id: string; opening_message: string | null; est_minutes: number }> {
+  const systemPrompt = `You are an expert executive simulation designer.
+The user wants to practice a specific real-world conversation:
+"${situation}"
+
+Design a realistic role-play scenario. Return JSON ONLY with this schema:
+{
+  "title": "<punchy title under 40 chars>",
+  "category": "custom",
+  "description": "<1-2 sentence overview of the scenario>",
+  "learner_objective": "<clear, actionable goal for the learner>",
+  "persona_name": "<realistic human name for the persona>",
+  "persona_role": "<their role or relation to the user>",
+  "persona_public_brief": "<who they are, tone, demeanor>",
+  "persona_private_brief": "<hidden motivations, constraints, budget, and when they will concede>",
+  "opening_message": "<optional realistic 1-2 sentence opener from them, or null if user speaks first>",
+  "difficulty_guides": {
+    "friendly": "Open, polite, willing to listen.",
+    "neutral": "Professional, skeptical without hard data.",
+    "tough": "High-pressure, pushback, challenges assertions directly."
+  },
+  "rubric": [
+    {"key": "clarity", "label": "Clarity of the ask", "weight": 1},
+    {"key": "evidence", "label": "Evidence & persuasion", "weight": 1},
+    {"key": "tone", "label": "Composure & tone", "weight": 1},
+    {"key": "outcome", "label": "Next steps & agreement", "weight": 1}
+  ],
+  "est_minutes": 8
+}`;
+
+  const raw = await callLLM({
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: `Create scenario for: "${situation}"` },
+    ],
+    maxTokens: 800,
+  });
+
+  const parsed = parseJSON<any>(raw, {
+    title: 'Custom Practice Session',
+    category: 'custom',
+    description: situation,
+    learner_objective: 'Communicate your perspective clearly and reach an aligned agreement.',
+    persona_name: 'Jordan Vance',
+    persona_role: 'Counterpart',
+    persona_public_brief: 'Professional and direct.',
+    persona_private_brief: 'Open to solutions if presented constructively.',
+    opening_message: null,
+    difficulty_guides: {
+      friendly: 'Supportive and receptive.',
+      neutral: 'Measured and neutral.',
+      tough: 'Direct and skeptical.',
+    },
+    rubric: [
+      { key: 'clarity', label: 'Clarity of the ask', weight: 1 },
+      { key: 'evidence', label: 'Evidence & persuasion', weight: 1 },
+      { key: 'tone', label: 'Composure & tone', weight: 1 },
+      { key: 'outcome', label: 'Next steps & agreement', weight: 1 },
+    ],
+    est_minutes: 8,
+  });
+
+  const id = `custom_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+  return { ...parsed, id };
 }
 
 export async function generateCoachAnswer(

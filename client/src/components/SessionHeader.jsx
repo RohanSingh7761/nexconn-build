@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { UserPlus, Square, WifiOff } from 'lucide-react'
+import { UserPlus, Square, WifiOff, Loader2 } from 'lucide-react'
 
 function pad(n) {
   return String(n).padStart(2, '0')
@@ -17,6 +17,7 @@ export default function SessionHeader({
   difficulty = 'neutral',
   connectionStatus = 'connected',
   startedAt,
+  isFinishing = false,
   onInvite,
   onFinish,
 }) {
@@ -85,11 +86,22 @@ export default function SessionHeader({
         <button
           type="button"
           className="btn"
+          disabled={isFinishing}
           onClick={onFinish}
           aria-label="End this session"
+          style={{ opacity: isFinishing ? 0.7 : 1, cursor: isFinishing ? 'wait' : 'pointer' }}
         >
-          <Square size={14} aria-hidden="true" />
-          <span>Finish</span>
+          {isFinishing ? (
+            <>
+              <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+              <span>Evaluating...</span>
+            </>
+          ) : (
+            <>
+              <Square size={14} aria-hidden="true" />
+              <span>Finish</span>
+            </>
+          )}
         </button>
       </div>
     </header>

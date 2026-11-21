@@ -23,7 +23,14 @@ import * as db from './db/queries.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
-const JWT_SECRET = process.env.JWT_SECRET || 'rehearsal-secret-key-development';
+// Secrets and credentials come only from server/.env. Fail at startup rather than fall back to a public default.
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`Missing required environment variable ${name}. Set it in server/.env.`);
+  return value;
+}
+
+const JWT_SECRET = requireEnv('JWT_SECRET');
 
 // Middleware
 app.use(helmet());
@@ -32,10 +39,10 @@ app.use(express.json({ limit: '1mb' }));
 
 // Init Nexconn SDK
 initNexconnServer({
-  appKey: process.env.NEXCONN_APP_KEY || '6tnym1br6ia37',
-  appSecret: process.env.NEXCONN_APP_SECRET || 'y39k0InBtQUZ',
-  primaryDomain: process.env.NEXCONN_PRIMARY_API_DOMAIN || 'api.sg-light-api.com',
-  secondaryDomain: process.env.NEXCONN_SECONDARY_API_DOMAIN || 'api-b.sg-light-api.com',
+  appKey: requireEnv('NEXCONN_APP_KEY'),
+  appSecret: requireEnv('NEXCONN_APP_SECRET'),
+  primaryDomain: requireEnv('NEXCONN_PRIMARY_API_DOMAIN'),
+  secondaryDomain: requireEnv('NEXCONN_SECONDARY_API_DOMAIN'),
 });
 
 // Startup: Register bot_coach in Nexconn

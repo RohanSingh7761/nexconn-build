@@ -662,7 +662,32 @@ app.post('/api/invites/:code/join', requireAuth, async (req: AuthenticatedReques
       return;
     }
 
-    await db.joinSessionWithInvite(invite.session_id, req.user!.id, invite.code);
+    const me = req.user!;
+    const sceneTarget = { type: 'group', targetId: invite.persona_nexconn_id };
+
+    // Partner mode: the first joiner (not the owner) takes the interviewer seat. Reloading as the partner is idempotent.
+    if (invite.mode === 'partner' && invite.owner_id !== me.id) {
+      const alreadyPartner = invite.partner_user_id === me.id;
+      const claimed = alreadyPartner || (!invite.partner_user_id && (await db.setSessionPartner(invite.session_id, me.id)));
+      if (claimed) {
+        if (!alreadyPartner) {
+          await joinCoachGroup(invite.persona_nexconn_id, [me.nexconnUserId]).catch(() => {});
+          const scenario = await db.getScenarioById(invite.scenario_id);
+          const notice = JSON.stringify({
+            v: 1,
+            kind: 'system_notice',
+            text: `${me.displayName} joined as ${scenario?.persona_name ?? 'the partner'}.`,
+          });
+          await sendGroupText('bot_coach', invite.coach_group_id, notice).catch(() => {});
+        }
+        // The partner never sees the private coach channel, so only the scene is returned.
+        res.json({ sessionId: invite.session_id, role: 'partner', channels: { scene: sceneTarget } });
+        return;
+      }
+      // Seat already taken by someone else: fall through and join as a mentor.
+    }
+
+    await db.joinSessionWithInvite(invite.session_id, me.id, invite.code);
 
     // Join mentor's Nexconn user to coach group channel
     await joinCoachGroup(invite.coach_group_id, [req.user!.nexconnUserId]).catch(() => {});
@@ -675,7 +700,7 @@ app.post('/api/invites/:code/join', requireAuth, async (req: AuthenticatedReques
     });
     await sendGroupText('bot_coach', invite.coach_group_id, notice).catch(() => {});
 
-    res.json({ sessionId: invite.session_id, coachGroupId: invite.coach_group_id });
+    res.json({ sessionId: invite.session_id, coachGroupId: invite.coach_group_id, role: 'mentor' });
   } catch (err: any) {
     res.status(500).json({ error: { code: 'SERVER_ERROR', message: err.message } });
   }

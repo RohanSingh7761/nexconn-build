@@ -338,7 +338,8 @@ export async function createInvite(
 
 export async function getInvite(code: string) {
   const { rows } = await pool.query(
-    `SELECT i.*, s.coach_group_id
+    `SELECT i.*, s.coach_group_id, s.mode, s.persona_nexconn_id, s.scenario_id,
+            s.user_id AS owner_id, s.partner_user_id
      FROM invites i
      JOIN sessions s ON i.session_id = s.id
      WHERE i.code = $1 AND i.expires_at > now() AND i.use_count < i.max_uses`,

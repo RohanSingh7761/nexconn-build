@@ -452,6 +452,7 @@ app.post('/api/sessions/:id/turns', requireAuth, async (req: AuthenticatedReques
       );
     }
 
+    await db.incrementTurnCount(session.id);
     res.json({
       learnerMessageId: learnerMsg.id,
       persona: {

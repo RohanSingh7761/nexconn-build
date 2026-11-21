@@ -261,6 +261,10 @@ export async function updateSessionEnd(sessionId: string): Promise<SessionRow> {
   return rows[0];
 }
 
+export async function incrementTurnCount(sessionId: string): Promise<void> {
+  await pool.query(`UPDATE sessions SET turn_count = turn_count + 1 WHERE id = $1`, [sessionId]);
+}
+
 export async function saveScorecard(
   sessionId: string,
   overallScore: number,

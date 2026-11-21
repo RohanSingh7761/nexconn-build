@@ -379,6 +379,16 @@ app.get('/api/sessions/:id/transcript', requireAuth, async (req: AuthenticatedRe
    TURNS & CHAT (THE CORE AI LOOP)
 ───────────────────────────────────────────────────────────────────────────── */
 
+// Sends a coach tip into the private coach group as bot_coach and stores it. Nexconn failures never lose the DB write.
+async function postCoachTip(session: db.SessionRow, learnerMsgId: number, tip: object) {
+  const payload = JSON.stringify(tip);
+  const delivery = await sendGroupText('bot_coach', session.coach_group_id, payload).catch((e) => {
+    console.warn('[turns] Nexconn coach group error:', e.message);
+    return null;
+  });
+  return db.saveMessage(session.id, 'coach', 'coach', null, payload, tip, learnerMsgId, delivery?.messageUid || null);
+}
+
 app.post('/api/sessions/:id/turns', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { text, nexconnMessageUid } = req.body;
@@ -400,6 +410,44 @@ app.post('/api/sessions/:id/turns', requireAuth, async (req: AuthenticatedReques
     const scenario = await db.getScenarioById(session.scenario_id);
     if (!scenario) {
       res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Scenario not found' } });
+      return;
+    }
+
+    // Partner mode: two humans talk; the AI only whispers a tip to the interviewee. No persona reply.
+    if (session.mode === 'partner') {
+      const isOwner = session.user_id === req.user!.id;
+      const isPartner = session.partner_user_id === req.user!.id;
+      if (!isOwner && !isPartner) {
+        res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Only the interviewee and the partner can send messages' } });
+        return;
+      }
+      // The partner plays the counterpart, so their messages are stored as 'persona' for the coach and scorecard.
+      const msg = await db.saveMessage(
+        session.id,
+        'scene',
+        isOwner ? 'learner' : 'persona',
+        req.user!.id,
+        text.trim(),
+        {},
+        null,
+        nexconnMessageUid || null
+      );
+      if (isPartner) {
+        res.json({ messageId: msg.id });
+        return;
+      }
+      const history = await db.getSceneMessages(session.id, 15);
+      const coachRes = await generateCoachTip(scenario, history, text.trim()).catch((err) => {
+        console.error('[turns] Coach LLM error:', err);
+        return null;
+      });
+      const coachMsg = coachRes ? await postCoachTip(session, msg.id, coachRes) : null;
+      await db.incrementTurnCount(session.id);
+      res.json({
+        learnerMessageId: msg.id,
+        persona: null,
+        coach: coachRes ? { messageId: coachMsg?.id, ...coachRes } : null,
+      });
       return;
     }
 
@@ -453,29 +501,7 @@ app.post('/api/sessions/:id/turns', requireAuth, async (req: AuthenticatedReques
     );
 
     // 6. If coach tip was generated, send via Nexconn SDK as bot_coach into group channel
-    let coachMsg: any = null;
-    if (coachRes) {
-      const coachPayload = JSON.stringify(coachRes);
-      const coachDelivery = await sendGroupText(
-        'bot_coach',
-        session.coach_group_id,
-        coachPayload
-      ).catch((e) => {
-        console.warn('[turns] Nexconn coach group error:', e.message);
-        return null;
-      });
-
-      coachMsg = await db.saveMessage(
-        session.id,
-        'coach',
-        'coach',
-        null,
-        coachPayload,
-        coachRes,
-        learnerMsg.id,
-        coachDelivery?.messageUid || null
-      );
-    }
+    const coachMsg = coachRes ? await postCoachTip(session, learnerMsg.id, coachRes) : null;
 
     await db.incrementTurnCount(session.id);
     res.json({

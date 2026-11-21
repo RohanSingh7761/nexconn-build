@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import * as api from './lib/api'
+import Dashboard from './components/Dashboard'
 import * as nx from './lib/nexconn'
 import SessionScreen from './components/SessionScreen'
 import ScenarioPicker from './components/ScenarioPicker'
@@ -504,7 +506,7 @@ export default function App() {
     const learnerMsgs = sceneMessages.filter((m) => m.senderType === 'learner')
     if (learnerMsgs.length === 0) {
       const shouldExit = window.confirm(
-        'You have not sent any messages in this rehearsal yet.\n\nExit now without generating a scorecard?'
+        'You have not sent any messages in this session yet.\n\nExit now without generating a scorecard?'
       )
       if (shouldExit) {
         setSession(null)
@@ -515,7 +517,7 @@ export default function App() {
     // Incomplete rehearsal confirmation (e.g. just "Hello Sir")
     if (learnerMsgs.length < 2) {
       const proceed = window.confirm(
-        'You have only sent 1 message so far.\n\nEnding the rehearsal now will record an incomplete session (low score). Are you sure you want to finish?'
+        'You have only sent 1 message so far.\n\nEnding the session now will record an incomplete session (low score). Are you sure you want to finish?'
       )
       if (!proceed) return
     }
@@ -560,13 +562,13 @@ export default function App() {
   if (viewSpike) {
     return (
       <div>
-        <div style={{ background: '#1c1e24', padding: '8px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333' }}>
-          <span style={{ color: '#aaa', fontSize: 13 }}>Nexconn Debug Harness</span>
+        <div style={{ background: 'var(--color-paper-3)', padding: '8px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-rule-2)' }}>
+          <span style={{ color: 'var(--color-muted)', fontSize: 13 }}>Nexconn Debug Harness</span>
           <button
             onClick={() => setViewSpike(false)}
-            style={{ background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}
+            style={{ background: 'var(--color-accent)', color: 'var(--color-accent-ink)', border: 'none', borderRadius: 4, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}
           >
-            Switch to Rehearsal App UI
+            Switch to DryRun app UI
           </button>
         </div>
         <Spike />
@@ -576,30 +578,15 @@ export default function App() {
 
   if (loadingUser) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0a0c10', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8b949e' }}>
-        Loading Rehearsal...
+      <div style={{ minHeight: '100vh', background: 'var(--color-paper-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-muted)' }}>
+        Loading DryRun…
       </div>
-    )
-  }
-
-  if (!user) {
-    return <AuthModal onLoginSuccess={(u) => setUser(u)} />
-  }
-
-  if (!session) {
-    return (
-      <ScenarioPicker
-        user={user}
-        onStartSession={handleStartSession}
-        onJoinInvite={handleJoinInvite}
-        onLogout={handleLogout}
-      />
     )
   }
 
   const role = roleOf(session, user)
 
-  return (
+  const sessionView = session ? (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <SessionScreen
         session={{
@@ -638,5 +625,25 @@ export default function App() {
         />
       )}
     </div>
+  ) : null
+
+  return (
+    <Routes>
+      <Route path="/" element={<Dashboard user={user} onLogout={handleLogout} />} />
+      <Route path="/sign-in" element={user ? <Navigate to="/practice" replace /> : <AuthModal mode="sign-in" onLoginSuccess={setUser} />} />
+      <Route path="/signup" element={user ? <Navigate to="/practice" replace /> : <AuthModal mode="signup" onLoginSuccess={setUser} />} />
+      <Route
+        path="/practice"
+        element={!user ? <Navigate to="/sign-in" replace /> : sessionView ?? (
+          <ScenarioPicker
+            user={user}
+            onStartSession={handleStartSession}
+            onJoinInvite={handleJoinInvite}
+            onLogout={handleLogout}
+          />
+        )}
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }

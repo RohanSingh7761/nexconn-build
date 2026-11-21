@@ -1,4 +1,4 @@
-# Rehearsal (Nexconn Build Challenge 2026)
+# DryRun (Nexconn Build Challenge 2026)
 
 Practice hard conversations in chat before having them for real. An AI plays the other person realistically (Scene channel) while an AI coach whispers feedback in a separate side channel (Coach channel). A human mentor can also join the coach channel live.
 
@@ -108,7 +108,7 @@ LLM_MODEL_SCORE=gpt-4o-mini
 ### Client (`client/.env`)
 ```env
 # Set VITE_SPIKE=1 to open the Phase 0 Nexconn Spike verification page.
-# Set VITE_SPIKE=0 to open the Rehearsal SessionScreen.
+# Set VITE_SPIKE=0 to open the DryRun SessionScreen.
 VITE_SPIKE=1
 ```
 
@@ -149,7 +149,7 @@ Open `http://localhost:5173` in your browser.
   5. Click **Connect** to connect to Nexconn real-time messaging, send messages, and view history!
 
 - When `VITE_SPIKE=0` (in `client/.env`):
-  Runs the full **Rehearsal Session Screen** with Scene Chat and Coach Panel tabs.
+  Runs the full **DryRun Session Screen** with Scene Chat and Coach Panel tabs.
 
 ### Step C: Build for Production
 ```bash

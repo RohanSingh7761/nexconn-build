@@ -679,7 +679,7 @@ app.post('/api/sessions/:id/end', requireAuth, async (req: AuthenticatedRequest,
 
         evaluation = {
           overall_score: overallScore,
-          summary: `Rehearsal ended prematurely after only ${learnerMessages.length} brief exchange(s) (${quotes}). The conversation never progressed to presenting evidence or addressing the core objective: "${scenario.learner_objective}".`,
+          summary: `The session ended prematurely after only ${learnerMessages.length} brief exchange(s) (${quotes}). The conversation never progressed to presenting evidence or addressing the core objective: "${scenario.learner_objective}".`,
           dimensions: scenario.rubric.map((r: any) => ({
             key: r.key,
             label: r.label,
@@ -840,7 +840,7 @@ app.post('/api/partner-sessions/:id/join', requireAuth, async (req: Authenticate
       return;
     }
     if (session.status !== 'active') {
-      res.status(409).json({ error: { code: 'NOT_ACTIVE', message: 'This rehearsal has already ended' } });
+      res.status(409).json({ error: { code: 'NOT_ACTIVE', message: 'This session has already ended' } });
       return;
     }
     if (session.mode !== 'partner') {

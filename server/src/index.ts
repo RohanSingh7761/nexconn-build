@@ -352,9 +352,15 @@ app.get('/api/sessions/:id', requireAuth, async (req: AuthenticatedRequest, res:
     const scenario = await db.getScenarioById(session.scenario_id);
     const myRole =
       session.user_id === req.user!.id ? 'learner' : session.partner_user_id === req.user!.id ? 'partner' : 'mentor';
+    // The persona's hidden goals are only for the human playing them, never the interviewee or a mentor.
+    let visibleScenario: Partial<db.ScenarioRow> | null = scenario;
+    if (scenario && myRole !== 'partner') {
+      const { persona_private_brief, ...rest } = scenario;
+      visibleScenario = rest;
+    }
     res.json({
       session,
-      scenario,
+      scenario: visibleScenario,
       channels: {
         scene: sceneChannel(session),
         coach: { type: 'group', targetId: session.coach_group_id },

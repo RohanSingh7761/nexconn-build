@@ -602,14 +602,24 @@ app.post('/api/sessions/:id/end', requireAuth, async (req: AuthenticatedRequest,
       return;
     }
 
-    await db.updateSessionEnd(session.id);
+    // In partner mode only the interviewee ends the session; the partner just gets locked out.
+    if (session.mode === 'partner' && session.user_id !== req.user!.id) {
+      res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Only the interviewee can end this session' } });
+      return;
+    }
+
+    const endedSession = await db.updateSessionEnd(session.id);
+    if (session.mode === 'partner' && session.status !== 'completed') {
+      // Tells the partner's client to lock the scene composer.
+      await sendGroupText('bot_coach', session.persona_nexconn_id, JSON.stringify({ v: 1, kind: 'session_ended' })).catch(() => {});
+    }
     const scenario = await db.getScenarioById(session.scenario_id);
     const messages = await db.getSessionMessages(session.id);
 
     const learnerMessages = messages.filter((m) => m.sender_type === 'learner');
     if (learnerMessages.length === 0) {
       res.json({
-        session: { ...session, status: 'completed' },
+        session: endedSession,
         scorecard: null,
         message: 'No messages were sent in this session. No scorecard was generated.',
       });
@@ -640,7 +650,7 @@ app.post('/api/sessions/:id/end', requireAuth, async (req: AuthenticatedRequest,
       await sendGroupText('bot_coach', session.coach_group_id, noticePayload).catch(() => {});
     }
 
-    res.json({ session, scorecard });
+    res.json({ session: endedSession, scorecard });
   } catch (err: any) {
     res.status(500).json({ error: { code: 'SERVER_ERROR', message: err.message } });
   }

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 console.log('\n===========================================');
-console.log('   Starting Rehearsal Development Suite    ');
+console.log('   Starting DryRun Development Suite    ');
 console.log('===========================================\n');
 
 // Step 1: Ensure database schema & seed are up to date

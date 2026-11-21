@@ -14,7 +14,7 @@ html, body {
 }
 
 html {
-  background-color: var(--color-paper);
+  background-color: var(--color-paper-2);
   color: var(--color-ink);
   font-family: var(--font-body);
   font-size: var(--text-base);
@@ -241,7 +241,7 @@ input, textarea {
   background: var(--color-paper-3);
   border: var(--rule-hair) solid var(--color-rule);
   border-radius: var(--radius-pill);
-  padding: 3px 8px;
+  padding: var(--space-xs) var(--space-sm);
   max-width: 180px;
 }
 
@@ -265,13 +265,13 @@ input, textarea {
 }
 
 .session-user-badge__avatar--partner {
-  background: color-mix(in oklab, #8b5cf6 25%, transparent);
-  color: #c4b5fd;
+  background: color-mix(in oklab, var(--color-cool) 25%, transparent);
+  color: var(--color-cool);
 }
 
 .session-user-badge__avatar--mentor {
-  background: color-mix(in oklab, #8b5cf6 25%, transparent);
-  color: #c4b5fd;
+  background: color-mix(in oklab, var(--color-cool) 25%, transparent);
+  color: var(--color-cool);
 }
 
 .session-user-badge__meta {
@@ -294,7 +294,6 @@ input, textarea {
 .session-user-badge__tag {
   font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.05em;
   line-height: 1;
 }
 
@@ -303,17 +302,17 @@ input, textarea {
 }
 
 .session-user-badge__tag--partner {
-  color: #c4b5fd;
+  color: var(--color-cool);
 }
 
 .session-user-badge__tag--mentor {
-  color: #c4b5fd;
+  color: var(--color-cool);
 }
 
 .chip--role {
-  background: color-mix(in oklab, #8b5cf6 20%, transparent);
-  color: #c4b5fd;
-  border-color: color-mix(in oklab, #8b5cf6 40%, transparent);
+  background: color-mix(in oklab, var(--color-cool) 20%, transparent);
+  color: var(--color-cool);
+  border-color: color-mix(in oklab, var(--color-cool) 40%, transparent);
   font-size: 10px;
   font-weight: 700;
 }
@@ -331,7 +330,7 @@ input, textarea {
   font-weight: 600;
   color: var(--color-muted);
   margin-bottom: 3px;
-  margin-left: 2px;
+  margin-left: var(--space-2xs);
 }
 
 .timer {
@@ -347,6 +346,7 @@ input, textarea {
   flex: 1;
   display: grid;
   grid-template-columns: 1fr var(--panel-w);
+  grid-template-rows: minmax(0, 1fr);  /* one row, so both panels fill the screen */
   overflow: hidden;
   min-height: 0;
 }
@@ -358,6 +358,24 @@ input, textarea {
   border-right: var(--rule-hair) solid var(--color-rule);
   min-width: 0;
   overflow: hidden;
+}
+
+/* settings card stays in view beside the list on desktop; stacks normally on phones */
+.picker-aside {
+  position: sticky;
+  top: var(--space-md);
+  align-self: flex-start;
+}
+@media (max-width: 767px) {
+  .picker-aside { position: static; }
+}
+
+/* the scene component fills its pane, so the composer sits at the bottom */
+.scene-chat {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .message-list {
@@ -478,7 +496,7 @@ input, textarea {
   display: flex;
   align-items: flex-end;
   gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-lg);
+  padding: var(--space-sm) var(--space-lg) var(--space-lg);
   border-top: var(--rule-hair) solid var(--color-rule);
   background: var(--color-paper-2);
   min-height: var(--composer-h);
@@ -582,13 +600,13 @@ input, textarea {
 
 /* Human Mentor Note - Rich Violet Accent with high contrast differentiation */
 .coach-item--mentor {
-  background: color-mix(in oklab, #8b5cf6 10%, var(--color-paper-2));
-  border: 1px solid color-mix(in oklab, #8b5cf6 35%, var(--color-rule));
-  border-left: 3.5px solid #a78bfa;
-  box-shadow: 0 2px 10px rgba(139, 92, 246, 0.08);
+  background: color-mix(in oklab, var(--color-cool) 10%, var(--color-paper-2));
+  border: 1px solid color-mix(in oklab, var(--color-cool) 35%, var(--color-rule));
+  border-left: 3.5px solid var(--color-cool);
+  box-shadow: 0 2px 10px color-mix(in oklch, var(--color-cool) 8%, transparent);
 }
 .coach-item--mentor:hover {
-  border-color: color-mix(in oklab, #8b5cf6 55%, var(--color-rule));
+  border-color: color-mix(in oklab, var(--color-cool) 55%, var(--color-rule));
 }
 
 /* Learner note / question in coach channel */
@@ -612,22 +630,20 @@ input, textarea {
 .mentor-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  background: color-mix(in oklab, #8b5cf6 25%, transparent);
-  color: #c4b5fd;
-  border: 1px solid color-mix(in oklab, #8b5cf6 40%, transparent);
+  gap: var(--space-xs);
+  background: color-mix(in oklab, var(--color-cool) 25%, transparent);
+  color: var(--color-cool);
+  border: 1px solid color-mix(in oklab, var(--color-cool) 40%, transparent);
   border-radius: var(--radius-pill);
-  padding: 2px 6px;
+  padding: var(--space-2xs) var(--space-xs);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .mentor-card__sender {
   font-size: var(--text-xs);
   font-weight: 600;
-  color: #e9d5ff;
+  color: var(--color-cool);
 }
 
 .mentor-card__text {
@@ -645,10 +661,9 @@ input, textarea {
   color: var(--color-accent);
   border: 1px solid color-mix(in oklab, var(--color-accent) 40%, transparent);
   border-radius: var(--radius-pill);
-  padding: 2px 6px;
+  padding: var(--space-2xs) var(--space-xs);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.06em;
 }
 
 .learner-card__text {
@@ -662,15 +677,13 @@ input, textarea {
 .coach-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-xs);
   background: color-mix(in oklab, var(--color-cool) 20%, transparent);
   color: var(--color-cool);
   border-radius: var(--radius-pill);
-  padding: 2px 6px;
+  padding: var(--space-2xs) var(--space-xs);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .coach-badge--subtle {
@@ -695,9 +708,9 @@ input, textarea {
 }
 
 .chip--mentor {
-  background: color-mix(in oklab, #8b5cf6 20%, transparent);
-  color: #c4b5fd;
-  border-color: color-mix(in oklab, #8b5cf6 40%, transparent);
+  background: color-mix(in oklab, var(--color-cool) 20%, transparent);
+  color: var(--color-cool);
+  border-color: color-mix(in oklab, var(--color-cool) 40%, transparent);
 }
 
 .tip-card__text {
@@ -732,8 +745,6 @@ input, textarea {
   font-size: 11px;
   color: var(--color-muted);
   font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 /* mentor bubble inside coach panel */
@@ -773,7 +784,7 @@ input, textarea {
   display: flex;
   align-items: flex-end;
   gap: var(--space-xs);
-  padding: var(--space-xs) var(--space-md) var(--space-sm);
+  padding: var(--space-xs) var(--space-md) var(--space-lg);
   border-top: var(--rule-hair) solid var(--color-rule);
   background: var(--color-paper-2);
 }
@@ -1030,27 +1041,27 @@ input, textarea {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.3px;
-  padding: 2px 8px;
+  padding: var(--space-2xs) var(--space-sm);
   border-radius: 12px;
-  transition: all 0.2s ease;
+  transition: background-color var(--dur-short) var(--ease-out), color var(--dur-short) var(--ease-out);
 }
 
 .coach-status--ready {
-  background: rgba(46, 160, 67, 0.15);
-  color: #3fb950;
-  border: 1px solid rgba(46, 160, 67, 0.3);
+  background: color-mix(in oklch, var(--color-ok) 15%, transparent);
+  color: var(--color-ok);
+  border: 1px solid color-mix(in oklch, var(--color-ok) 30%, transparent);
 }
 
 .coach-status--thinking {
-  background: rgba(88, 166, 255, 0.15);
-  color: #58a6ff;
-  border: 1px solid rgba(88, 166, 255, 0.3);
+  background: color-mix(in oklch, var(--color-accent) 15%, transparent);
+  color: var(--color-accent);
+  border: 1px solid color-mix(in oklch, var(--color-accent) 30%, transparent);
 }
 
 .coach-status--fallback {
-  background: rgba(210, 153, 34, 0.15);
-  color: #d29922;
-  border: 1px solid rgba(210, 153, 34, 0.3);
+  background: color-mix(in oklch, var(--color-warn) 15%, transparent);
+  color: var(--color-warn);
+  border: 1px solid color-mix(in oklch, var(--color-warn) 30%, transparent);
 }
 
 .coach-status-dot {
@@ -1077,26 +1088,26 @@ input, textarea {
 .coach-thinking-bubble {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
   padding: 10px 14px;
-  background: var(--color-paper-2, #161b22);
-  border: 1px solid var(--color-rule, #30363d);
+  background: var(--color-paper-2, var(--color-paper));
+  border: 1px solid var(--color-rule, var(--color-rule));
   border-radius: 8px;
-  color: #8b949e;
+  color: var(--color-muted);
   font-size: 12px;
 }
 
 .coach-thinking-dots {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 
 .coach-thinking-dot {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background-color: #58a6ff;
+  background-color: var(--color-accent);
   animation: bounce-dot 1.4s infinite ease-in-out both;
 }
 

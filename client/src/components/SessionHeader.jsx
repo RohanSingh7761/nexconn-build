@@ -67,10 +67,10 @@ export default function SessionHeader({
           <div className="measured" style={{ fontSize: '11px', display: 'flex', gap: 6, alignItems: 'center' }}>
             <span>{personaRole}</span>
             {isPartner && ownerName && (
-              <span style={{ color: '#c4b5fd' }}>• Partner for {ownerName}</span>
+              <span style={{ color: 'var(--color-cool)' }}>• Partner for {ownerName}</span>
             )}
             {isMentor && ownerName && (
-              <span style={{ color: '#bc8cff' }}>• Observing {ownerName}</span>
+              <span style={{ color: 'var(--color-cool)' }}>• Observing {ownerName}</span>
             )}
           </div>
         </div>
@@ -112,15 +112,9 @@ export default function SessionHeader({
         )}
 
         {/* Top Right: Who YOU are */}
-        <div className="session-user-badge" title={`Signed in as ${currentUserName} (${myRole})`}>
-          <div className={`session-user-badge__avatar session-user-badge__avatar--${myRole}`}>
+        <div className="session-user-badge">
+          <div className={`session-user-badge__avatar session-user-badge__avatar--${myRole}`} role="img" aria-label={`Signed in as ${currentUserName} (${myRole})`} title={`Signed in as ${currentUserName} (${myRole})`}>
             {currentUserInitials}
-          </div>
-          <div className="session-user-badge__meta">
-            <span className="session-user-badge__name">{currentUserName}</span>
-            <span className={`session-user-badge__tag session-user-badge__tag--${myRole}`}>
-              {myRole === 'partner' ? 'PARTNER' : myRole === 'mentor' ? 'MENTOR' : 'LEARNER'}
-            </span>
           </div>
         </div>
 
@@ -154,7 +148,7 @@ export default function SessionHeader({
               {isFinishing ? (
                 <>
                   <Loader2 size={14} className="animate-spin" aria-hidden="true" />
-                  <span>Evaluating...</span>
+                  <span>Evaluating…</span>
                 </>
               ) : (
                 <>
@@ -169,7 +163,7 @@ export default function SessionHeader({
             type="button"
             className="btn btn--ghost"
             onClick={onLeave}
-            title="Leave this rehearsal session"
+            title="Leave this session"
             style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}
           >
             <LogOut size={14} />

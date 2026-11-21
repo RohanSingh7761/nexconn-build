@@ -1,6 +1,6 @@
 {
   "appId": "com.rehearsal.app",
-  "appName": "Rehearsal",
+  "appName": "DryRun",
   "webDir": "dist",
   "server": { "androidScheme": "https" },
   "plugins": { "Keyboard": { "resize": "body" } }

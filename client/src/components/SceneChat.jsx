@@ -28,7 +28,7 @@ export default function SceneChat({
   const isDisabled = pendingTurn || ended || connectionStatus === 'disconnected'
 
   return (
-    <div className="chat-pane" aria-label="Scene conversation">
+    <div className="scene-chat" aria-label="Scene conversation">
       <div
         className="message-list"
         role="log"
@@ -42,7 +42,7 @@ export default function SceneChat({
               <path d="M8 32v5l6-5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <p className="empty-state__label">
-              The scene is ready. Send your opening message to begin the rehearsal.
+              The scene is ready. Send your opening message to begin the session.
             </p>
           </div>
         )}

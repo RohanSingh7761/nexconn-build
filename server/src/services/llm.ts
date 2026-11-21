@@ -37,7 +37,7 @@ export async function callLLM(options: LLMOptions): Promise<string> {
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': 'http://localhost:5173',
-          'X-Title': 'Rehearsal',
+          'X-Title': 'DryRun',
         },
         body: JSON.stringify({
           model,
@@ -415,7 +415,7 @@ Return JSON ONLY with this schema:
   const parsed = parseJSON<ScorecardResult>(raw, {
     overall_score: fallbackScore,
     summary: isShort
-      ? 'The rehearsal ended before a complete conversation could take place. More turns are needed to demonstrate full persuasion.'
+      ? 'The session ended before a complete conversation could take place. More turns are needed to demonstrate full persuasion.'
       : 'Solid effort with clear intent. Incorporating more quantifiable business outcomes and confident framing will elevate your impact.',
     dimensions: scenario.rubric.map((r) => ({
       key: r.key,

@@ -2,7 +2,7 @@
 function Section({ title, children }) {
   return (
     <section>
-      <div className="measured" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+      <div className="measured" style={{ fontSize: '11px', marginBottom: 4 }}>
         {title}
       </div>
       <div style={{ fontSize: 'var(--text-sm)', lineHeight: 1.5, color: 'var(--color-ink)' }}>{children}</div>

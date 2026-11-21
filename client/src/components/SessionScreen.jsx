@@ -217,6 +217,8 @@ export default function SessionScreen({
                 tips={coachMessages}
                 onAsk={onAskCoach}
                 isMentor={session?.isMentor}
+                isThinking={session?.isAskingCoach || pendingTurn}
+                coachStatus={session?.coachStatus || (pendingTurn || session?.isAskingCoach ? 'thinking' : 'ready')}
               />
             )}
           </div>

@@ -80,6 +80,11 @@ export default function TipCard({ tip }) {
             <Bot size={13} />
             <span>COACH GUIDANCE</span>
           </div>
+          {tip.isFallback && (
+            <span className="chip chip--bad" style={{ fontSize: '9px', fontWeight: 700 }} title="AI rate limit reached. Showing offline heuristic coaching.">
+              HEURISTIC
+            </span>
+          )}
           {tip.createdAt && (
             <span className="coach-item__time">
               {new Date(tip.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

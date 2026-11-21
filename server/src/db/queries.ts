@@ -371,3 +371,37 @@ export async function getSessionMemberRole(sessionId: string, userId: string): P
   }
   return null;
 }
+
+export interface OpenPartnerSessionRow {
+  id: string;
+  scenario_id: string;
+  started_at: Date;
+  user_context: string | null;
+  coach_group_id: string;
+  persona_nexconn_id: string;
+  owner_id: string;
+  owner_name: string;
+  owner_username: string;
+  scenario_title: string;
+  persona_name: string;
+  persona_role: string;
+  category: string;
+  description: string;
+}
+
+export async function listOpenPartnerSessions(): Promise<OpenPartnerSessionRow[]> {
+  const { rows } = await pool.query<OpenPartnerSessionRow>(`
+    SELECT s.id, s.scenario_id, s.started_at, s.user_context, s.coach_group_id, s.persona_nexconn_id,
+           u.id as owner_id, COALESCE(u.display_name, u.username) as owner_name, u.username as owner_username,
+           sc.title as scenario_title, sc.persona_name, sc.persona_role, sc.category, sc.description
+    FROM sessions s
+    JOIN users u ON s.user_id = u.id
+    JOIN scenarios sc ON s.scenario_id = sc.id
+    WHERE s.mode = 'partner'
+      AND s.status = 'active'
+      AND s.partner_user_id IS NULL
+    ORDER BY s.started_at DESC
+    LIMIT 30
+  `);
+  return rows;
+}

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Sparkles, Zap, Clock, User, LogOut, Shield, MessageSquarePlus, ListFilter } from 'lucide-react'
+import { Sparkles, Zap, Clock, User, LogOut, Shield, MessageSquarePlus, ListFilter, Users, RefreshCw } from 'lucide-react'
 import * as api from '../lib/api'
 
 export default function ScenarioPicker({ user, onStartSession, onJoinInvite, onLogout }) {
-  const [tab, setTab] = useState('custom') // 'custom' | 'presets'
+  const [tab, setTab] = useState('custom') // 'custom' | 'presets' | 'explore'
   const [scenarios, setScenarios] = useState([])
+  const [openSessions, setOpenSessions] = useState([])
+  const [loadingExplore, setLoadingExplore] = useState(false)
   const [selectedId, setSelectedId] = useState('')
   const [difficulty, setDifficulty] = useState('neutral')
   const [mode, setMode] = useState('ai') // 'ai' = AI plays the other person, 'partner' = a human does
@@ -16,6 +18,18 @@ export default function ScenarioPicker({ user, onStartSession, onJoinInvite, onL
   const [fetching, setFetching] = useState(true)
   const [error, setError] = useState('')
 
+  const fetchOpenSessions = async () => {
+    try {
+      setLoadingExplore(true)
+      const res = await api.listOpenPartnerSessions()
+      setOpenSessions(res.sessions || [])
+    } catch (err) {
+      console.warn('Failed to load partner sessions:', err)
+    } finally {
+      setLoadingExplore(false)
+    }
+  }
+
   useEffect(() => {
     api.listScenarios()
       .then((res) => {
@@ -25,6 +39,10 @@ export default function ScenarioPicker({ user, onStartSession, onJoinInvite, onL
       })
       .catch((err) => setError(err.message))
       .finally(() => setFetching(false))
+
+    fetchOpenSessions()
+    const interval = setInterval(fetchOpenSessions, 10000)
+    return () => clearInterval(interval)
   }, [])
 
   const selectedScenario = scenarios.find((s) => s.id === selectedId)
@@ -78,6 +96,23 @@ export default function ScenarioPicker({ user, onStartSession, onJoinInvite, onL
       onJoinInvite(res.sessionId, res.coachGroupId, res)
     } catch (err) {
       setError(err.message)
+      setLoading(false)
+    }
+  }
+
+  const handleJoinPartnerSession = async (sess) => {
+    if (sess.owner_id === user.id) {
+      setError('You created this session. Share your code or wait for another user to join!')
+      return
+    }
+    setLoading(true)
+    setLoadingText(`Joining as ${sess.persona_name}...`)
+    setError('')
+    try {
+      const res = await api.joinPartnerSession(sess.id)
+      onJoinInvite(res.sessionId, null, res)
+    } catch (err) {
+      setError(err.message || 'Could not join session.')
       setLoading(false)
     }
   }
@@ -139,12 +174,12 @@ export default function ScenarioPicker({ user, onStartSession, onJoinInvite, onL
         )}
 
         {/* Mode Selector Tabs */}
-        <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
           <button
             type="button"
             onClick={() => { setTab('custom'); setError('') }}
             style={{
-              flex: 1, padding: '12px 16px', borderRadius: 10, border: 'none',
+              flex: '1 1 200px', padding: '12px 16px', borderRadius: 10, border: 'none',
               background: tab === 'custom' ? 'rgba(56, 139, 253, 0.15)' : '#161b22',
               color: tab === 'custom' ? '#58a6ff' : '#8b949e',
               outline: tab === 'custom' ? '2px solid #58a6ff' : '1px solid #30363d',
@@ -152,13 +187,13 @@ export default function ScenarioPicker({ user, onStartSession, onJoinInvite, onL
             }}
           >
             <MessageSquarePlus size={18} />
-            <span>Type Your Own Situation (Custom)</span>
+            <span>Type Custom Situation</span>
           </button>
           <button
             type="button"
             onClick={() => { setTab('presets'); setError('') }}
             style={{
-              flex: 1, padding: '12px 16px', borderRadius: 10, border: 'none',
+              flex: '1 1 200px', padding: '12px 16px', borderRadius: 10, border: 'none',
               background: tab === 'presets' ? 'rgba(56, 139, 253, 0.15)' : '#161b22',
               color: tab === 'presets' ? '#58a6ff' : '#8b949e',
               outline: tab === 'presets' ? '2px solid #58a6ff' : '1px solid #30363d',
@@ -166,7 +201,29 @@ export default function ScenarioPicker({ user, onStartSession, onJoinInvite, onL
             }}
           >
             <ListFilter size={18} />
-            <span>Choose from Preset Scenarios</span>
+            <span>Preset Scenarios</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setTab('explore'); setError(''); fetchOpenSessions() }}
+            style={{
+              flex: '1 1 200px', padding: '12px 16px', borderRadius: 10, border: 'none',
+              background: tab === 'explore' ? 'rgba(56, 139, 253, 0.15)' : '#161b22',
+              color: tab === 'explore' ? '#58a6ff' : '#8b949e',
+              outline: tab === 'explore' ? '2px solid #58a6ff' : '1px solid #30363d',
+              fontWeight: 700, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+            }}
+          >
+            <Users size={18} />
+            <span>Explore Partners</span>
+            {openSessions.length > 0 && (
+              <span style={{
+                background: '#238636', color: '#fff', fontSize: 11, fontWeight: 700,
+                padding: '2px 7px', borderRadius: 10, letterSpacing: 0.3
+              }}>
+                {openSessions.length} LIVE
+              </span>
+            )}
           </button>
         </div>
 
@@ -510,6 +567,186 @@ export default function ScenarioPicker({ user, onStartSession, onJoinInvite, onL
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Tab 3: Explore Live Partner Sessions */}
+        {tab === 'explore' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{
+              background: '#161b22', border: '1px solid #30363d', borderRadius: 12,
+              padding: '20px 24px', display: 'flex', justifyContent: 'space-between',
+              alignItems: 'center', flexWrap: 'wrap', gap: 16
+            }}>
+              <div>
+                <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 6px', color: '#f0f6fc', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Users size={20} color="#58a6ff" />
+                  Live Rehearsals Waiting for a Partner
+                </h2>
+                <p style={{ margin: 0, fontSize: 13, color: '#8b949e', maxWidth: 640, lineHeight: 1.5 }}>
+                  Learners below started in <strong>A partner</strong> mode and need a human counterpart to role-play with.
+                  Click <strong>Join as Partner</strong> to jump directly into their rehearsal—no invite code required!
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={fetchOpenSessions}
+                disabled={loadingExplore}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px',
+                  background: '#21262d', border: '1px solid #30363d', borderRadius: 8,
+                  color: '#c9d1d9', fontSize: 13, fontWeight: 600, cursor: 'pointer'
+                }}
+              >
+                <RefreshCw size={14} style={{ animation: loadingExplore ? 'spin 1s linear infinite' : 'none' }} />
+                <span>Refresh</span>
+              </button>
+            </div>
+
+            {openSessions.length === 0 ? (
+              <div style={{
+                background: '#161b22', border: '1px dashed #30363d', borderRadius: 12,
+                padding: '60px 24px', textAlign: 'center'
+              }}>
+                <div style={{
+                  width: 54, height: 54, borderRadius: 27, background: 'rgba(56, 139, 253, 0.1)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px',
+                  color: '#58a6ff'
+                }}>
+                  <Users size={28} />
+                </div>
+                <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 600, color: '#f0f6fc' }}>
+                  No open partner rehearsals right now
+                </h3>
+                <p style={{ margin: '0 auto 20px', fontSize: 13, color: '#8b949e', maxWidth: 440, lineHeight: 1.5 }}>
+                  Nobody is currently waiting for a partner. Start your own rehearsal in <strong>A partner</strong> mode, or practice solo with our AI personas!
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { setTab('custom'); setMode('partner') }}
+                  style={{
+                    padding: '10px 18px', background: '#238636', border: 'none', borderRadius: 8,
+                    color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    display: 'inline-flex', alignItems: 'center', gap: 8
+                  }}
+                >
+                  <Sparkles size={15} />
+                  Start a Partner Rehearsal
+                </button>
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
+                gap: 16
+              }}>
+                {openSessions.map((s) => {
+                  const isHost = s.owner_id === user.id
+                  return (
+                    <div
+                      key={s.id}
+                      style={{
+                        background: '#161b22', border: '1px solid #30363d', borderRadius: 12,
+                        padding: 20, display: 'flex', flexDirection: 'column', gap: 14,
+                        position: 'relative'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{
+                            width: 28, height: 28, borderRadius: 14, background: '#30363d',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 12, fontWeight: 700, color: '#f0f6fc'
+                          }}>
+                            {(s.owner_name || 'U')[0].toUpperCase()}
+                          </div>
+                          <div>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: '#f0f6fc', display: 'block' }}>
+                              {s.owner_name} {isHost && <span style={{ color: '#58a6ff', fontSize: 11 }}>(You)</span>}
+                            </span>
+                            <span style={{ fontSize: 11, color: '#8b949e' }}>Host & Learner</span>
+                          </div>
+                        </div>
+
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 6,
+                          fontSize: 11, fontWeight: 700, letterSpacing: 0.4,
+                          padding: '3px 8px', borderRadius: 12,
+                          background: 'rgba(46, 160, 67, 0.15)', color: '#3fb950',
+                          border: '1px solid rgba(46, 160, 67, 0.3)'
+                        }}>
+                          <span style={{ width: 6, height: 6, borderRadius: 3, background: '#3fb950' }} />
+                          LIVE WAITING
+                        </span>
+                      </div>
+
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <span style={{
+                            fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5,
+                            fontWeight: 700, padding: '1px 6px', borderRadius: 4,
+                            background: 'rgba(56, 139, 253, 0.15)', color: '#58a6ff'
+                          }}>
+                            {s.category || 'Rehearsal'}
+                          </span>
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#f0f6fc' }}>
+                          {s.scenario_title}
+                        </h3>
+                      </div>
+
+                      <div style={{
+                        background: '#0d1117', border: '1px solid #21262d', borderRadius: 8,
+                        padding: '10px 12px'
+                      }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: '#8b949e', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 4 }}>
+                          Your Assigned Counterpart Role
+                        </span>
+                        <div style={{ fontSize: 13, color: '#e6edf3', fontWeight: 600 }}>
+                          {s.persona_name} <span style={{ color: '#8b949e', fontWeight: 400 }}>({s.persona_role})</span>
+                        </div>
+                      </div>
+
+                      {s.description && (
+                        <p style={{
+                          margin: 0, fontSize: 12, color: '#8b949e', lineHeight: 1.4,
+                          overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box',
+                          WebkitLineClamp: 2, WebkitBoxOrient: 'vertical'
+                        }}>
+                          {s.description}
+                        </p>
+                      )}
+
+                      <div style={{ marginTop: 'auto', paddingTop: 6 }}>
+                        {isHost ? (
+                          <div style={{
+                            textAlign: 'center', padding: '10px', background: '#21262d',
+                            borderRadius: 6, fontSize: 12, color: '#8b949e', fontWeight: 500
+                          }}>
+                            Your active session • Waiting for a partner to join
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={loading}
+                            onClick={() => handleJoinPartnerSession(s)}
+                            style={{
+                              width: '100%', padding: '10px 16px', borderRadius: 8, border: 'none',
+                              background: 'linear-gradient(135deg, #238636, #2ea043)', color: '#fff',
+                              fontWeight: 700, fontSize: 13, cursor: loading ? 'not-allowed' : 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                              boxShadow: '0 2px 8px rgba(35, 134, 54, 0.25)'
+                            }}
+                          >
+                            <Users size={15} />
+                            <span>Join as {s.persona_name} →</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -129,3 +129,11 @@ export async function createInvite(id) {
 export async function joinInvite(code) {
   return request(`/invites/${code}/join`, { method: 'POST' });
 }
+
+export async function listOpenPartnerSessions() {
+  return request('/partner-sessions');
+}
+
+export async function joinPartnerSession(sessionId) {
+  return request(`/partner-sessions/${sessionId}/join`, { method: 'POST' });
+}

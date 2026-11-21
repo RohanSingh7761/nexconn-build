@@ -594,11 +594,12 @@ app.post('/api/sessions/:id/coach-channel/messages', requireAuth, async (req: Au
       const scenario = await db.getScenarioById(session.scenario_id);
       if (scenario) {
         const history = await db.getSceneMessages(session.id, 10);
-        const answerText = await generateCoachAnswer(scenario, history, text.trim());
+        const { text: answerText, isFallback } = await generateCoachAnswer(scenario, history, text.trim());
         const coachPayload = JSON.stringify({
           v: 1,
           kind: 'coach_answer',
           text: answerText,
+          isFallback,
         });
 
         const delivery = await sendGroupText('bot_coach', session.coach_group_id, coachPayload).catch(() => null);
@@ -608,7 +609,7 @@ app.post('/api/sessions/:id/coach-channel/messages', requireAuth, async (req: Au
           'coach',
           null,
           coachPayload,
-          { kind: 'coach_answer' },
+          { kind: 'coach_answer', isFallback },
           userMsg.id,
           delivery?.messageUid || null
         );
@@ -813,6 +814,68 @@ app.post('/api/invites/:code/join', requireAuth, async (req: AuthenticatedReques
     await sendGroupText('bot_coach', invite.coach_group_id, notice).catch(() => {});
 
     res.json({ sessionId: invite.session_id, coachGroupId: invite.coach_group_id, role: 'mentor' });
+  } catch (err: any) {
+    res.status(500).json({ error: { code: 'SERVER_ERROR', message: err.message } });
+  }
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   EXPLORE & DISCOVER LIVE PARTNER SESSIONS
+───────────────────────────────────────────────────────────────────────────── */
+
+app.get('/api/partner-sessions', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const sessions = await db.listOpenPartnerSessions();
+    res.json({ sessions });
+  } catch (err: any) {
+    res.status(500).json({ error: { code: 'SERVER_ERROR', message: err.message } });
+  }
+});
+
+app.post('/api/partner-sessions/:id/join', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const session = await db.getSessionById(getParam(req.params.id));
+    if (!session) {
+      res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Session not found' } });
+      return;
+    }
+    if (session.status !== 'active') {
+      res.status(409).json({ error: { code: 'NOT_ACTIVE', message: 'This rehearsal has already ended' } });
+      return;
+    }
+    if (session.mode !== 'partner') {
+      res.status(400).json({ error: { code: 'INVALID_MODE', message: 'This is not a partner session' } });
+      return;
+    }
+    if (session.user_id === req.user!.id) {
+      res.status(400).json({ error: { code: 'CANNOT_JOIN_OWN', message: 'You are the creator of this session' } });
+      return;
+    }
+    if (session.partner_user_id && session.partner_user_id !== req.user!.id) {
+      res.status(409).json({ error: { code: 'ALREADY_TAKEN', message: 'Partner seat has already been claimed by someone else' } });
+      return;
+    }
+
+    const me = req.user!;
+    await db.setSessionPartner(session.id, me.id);
+
+    // Join scene group
+    await joinCoachGroup(session.persona_nexconn_id, [me.nexconnUserId]).catch(() => {});
+
+    const scenario = await db.getScenarioById(session.scenario_id);
+    const notice = JSON.stringify({
+      v: 1,
+      kind: 'system_notice',
+      text: `${me.displayName || me.username} joined as ${scenario?.persona_name ?? 'partner'}.`,
+    });
+    await sendGroupText('bot_coach', session.coach_group_id, notice).catch(() => {});
+    await sendGroupText('bot_coach', session.persona_nexconn_id, notice).catch(() => {});
+
+    res.json({
+      sessionId: session.id,
+      role: 'partner',
+      channels: { scene: { type: 'group', targetId: session.persona_nexconn_id } },
+    });
   } catch (err: any) {
     res.status(500).json({ error: { code: 'SERVER_ERROR', message: err.message } });
   }

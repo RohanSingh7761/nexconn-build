@@ -18,40 +18,63 @@ export async function callLLM(options: LLMOptions): Promise<string> {
     throw new Error('Missing OPEN_ROUTER_KEY or LLM_API_KEY in server/.env');
   }
 
-  const model = options.model || process.env.OPEN_ROUTER_MODEL_NAME || 'nvidia/nemotron-3.5-lightning:free';
-  const maxTokens = options.maxTokens ?? 500;
+  const primaryModel = options.model || process.env.OPEN_ROUTER_MODEL_NAME || 'nvidia/nemotron-3.5-lightning:free';
+  const modelsToTry = [
+    primaryModel,
+    'meta-llama/llama-3.3-70b-instruct:free',
+    'google/gemini-2.0-flash-lite-preview:free',
+    'qwen/qwen-2.5-coder-32b-instruct:free',
+  ];
 
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'http://localhost:5173',
-      'X-Title': 'Rehearsal',
-    },
-    body: JSON.stringify({
-      model,
-      messages: options.messages,
-      max_tokens: maxTokens,
-      reasoning: { max_tokens: 0 },
-    }),
-  });
+  let lastError: Error | null = null;
 
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`OpenRouter API error (${res.status}): ${errorText}`);
+  for (const model of modelsToTry) {
+    try {
+      const maxTokens = options.maxTokens ?? 500;
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'http://localhost:5173',
+          'X-Title': 'Rehearsal',
+        },
+        body: JSON.stringify({
+          model,
+          messages: options.messages,
+          max_tokens: maxTokens,
+          reasoning: { max_tokens: 0 },
+        }),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        if (res.status === 429) {
+          lastError = new Error(`OpenRouter rate limit on ${model}: ${errorText}`);
+          continue; // try next candidate model
+        }
+        throw new Error(`OpenRouter API error (${res.status}): ${errorText}`);
+      }
+
+      const data = (await res.json()) as any;
+      const choice = data.choices?.[0];
+      let content = choice?.message?.content?.trim() || '';
+
+      if (!content && choice?.message?.reasoning) {
+        content = choice.message.reasoning.trim();
+      }
+
+      if (content) {
+        return content;
+      }
+    } catch (err: any) {
+      lastError = err;
+      if (err.message?.includes('429')) continue;
+      throw err;
+    }
   }
 
-  const data = (await res.json()) as any;
-  const choice = data.choices?.[0];
-  let content = choice?.message?.content?.trim() || '';
-
-  // Fallback if model put answer in reasoning or choice content was empty
-  if (!content && choice?.message?.reasoning) {
-    content = choice.message.reasoning.trim();
-  }
-
-  return content;
+  throw lastError || new Error('All candidate models exhausted');
 }
 
 function parseJSON<T>(text: string, fallback: T): T {
@@ -166,13 +189,29 @@ Return JSON ONLY in this format:
   const recent = history.slice(-10).map((m) => `${m.sender_type}: ${m.content}`).join('\n');
   const userContent = `Recent conversation:\n${recent}\n\nLearner just said:\n"${latestLearnerMessage}"`;
 
-  const raw = await callLLM({
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userContent },
-    ],
-    maxTokens: 250,
-  });
+  let raw = '';
+  try {
+    raw = await callLLM({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userContent },
+      ],
+      maxTokens: 250,
+    });
+  } catch (err: any) {
+    console.warn('[generateCoachTip] LLM unavailable, using heuristic tip if substantive:', err.message);
+    if (latestLearnerMessage.trim().length > 18) {
+      return {
+        skip: false,
+        kind: 'coach_tip',
+        category: 'clarity',
+        sentiment: 'improve',
+        text: 'State specific outcomes to back your ask and maintain forward momentum.',
+        rewrite: null,
+      };
+    }
+    return null;
+  }
 
   const parsed = parseJSON<any>(raw, null);
   if (!parsed || parsed.skip) {
@@ -264,7 +303,7 @@ export async function generateCoachAnswer(
   scenario: ScenarioMeta,
   history: Array<{ sender_type: string; content: string }>,
   learnerQuestion: string
-): Promise<string> {
+): Promise<{ text: string; isFallback: boolean }> {
   const systemPrompt = `You are an expert communication coach whispering in a side channel.
 The learner is practicing: "${scenario.title}" (Objective: ${scenario.learner_objective}).
 The learner just asked you a direct question for guidance.
@@ -273,15 +312,33 @@ Answer in at most 50 words with direct, actionable advice and one concise phrasi
   const recent = history.slice(-8).map((m) => `${m.sender_type}: ${m.content}`).join('\n');
   const userContent = `Transcript so far:\n${recent}\n\nLearner asks:\n"${learnerQuestion}"`;
 
-  const raw = await callLLM({
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userContent },
-    ],
-    maxTokens: 200,
-  });
+  try {
+    const raw = await callLLM({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userContent },
+      ],
+      maxTokens: 200,
+    });
+    if (raw && raw.trim()) {
+      return { text: raw.trim(), isFallback: false };
+    }
+  } catch (err: any) {
+    console.warn('[generateCoachAnswer] LLM unavailable, using contextual heuristic guidance:', err.message);
+  }
 
-  return raw.trim() || 'Focus on concrete outcomes you delivered and ask for their perspective.';
+  // Robust Contextual Heuristic Coach Guidance:
+  const q = learnerQuestion.toLowerCase();
+  let heuristicAdvice = '';
+  if (q.includes('what to') || q.includes('kya karu') || q.includes('kya bolu') || q.includes('reply') || q.includes('say')) {
+    heuristicAdvice = `Pivot directly toward your objective: "${scenario.learner_objective}". Acknowledge their point, then state your request clearly with supporting evidence.\n\nExample phrasing: "I understand that completely. I'd like to share the specific results I delivered and see what options we have."`;
+  } else if (q.includes('no') || q.includes('disagree') || q.includes('push back') || q.includes('stuck') || q.includes('hesitate')) {
+    heuristicAdvice = `Stay calm and do not get defensive. Ask an open-ended question to uncover their constraint.\n\nExample phrasing: "Can you help me understand the main blockers from your perspective right now?"`;
+  } else {
+    heuristicAdvice = `Focus on your goal: ${scenario.learner_objective}. Be concise, lead with positive business impact, and invite their perspective.`;
+  }
+
+  return { text: heuristicAdvice, isFallback: true };
 }
 
 export interface ScorecardResult {

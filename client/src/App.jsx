@@ -26,6 +26,8 @@ export default function App() {
   const [sceneMessages, setSceneMessages] = useState([])
   const [coachMessages, setCoachMessages] = useState([])
   const [pendingTurn, setPendingTurn] = useState(false)
+  const [isAskingCoach, setIsAskingCoach] = useState(false)
+  const [coachStatus, setCoachStatus] = useState('ready') // 'ready' | 'thinking' | 'fallback'
   const [isFinishing, setIsFinishing] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState('disconnected')
   const [inviteCode, setInviteCode] = useState(null)
@@ -422,6 +424,11 @@ export default function App() {
       },
     ])
 
+    if (isLearner) {
+      setIsAskingCoach(true)
+      setCoachStatus('thinking')
+    }
+
     try {
       const res = await api.sendCoachMessage(session.id, trimmed, uid)
       if (res.coachReply) {
@@ -441,13 +448,34 @@ export default function App() {
               senderType: 'coach',
               text: answer,
               senderName: 'Coach (AI)',
+              isFallback: parsed?.isFallback || false,
               createdAt: Date.now(),
             },
           ])
         }
+        if (parsed?.isFallback) {
+          setCoachStatus('fallback')
+        } else {
+          setCoachStatus('ready')
+        }
       }
     } catch (err) {
       console.error('Coach message error:', err)
+      setCoachStatus('fallback')
+      setCoachMessages((prev) => [
+        ...prev,
+        {
+          uid: `offline-coach-${Date.now()}`,
+          kind: 'coach_answer',
+          senderType: 'coach',
+          text: "I'm right here with you! Focus on your primary goal: be direct, anchor on concrete outcomes, and ask open-ended questions like 'How does that sound?' or 'What are your thoughts on this?' You're doing great.",
+          senderName: 'Coach (AI)',
+          isFallback: true,
+          createdAt: Date.now(),
+        },
+      ])
+    } finally {
+      setIsAskingCoach(false)
     }
   }
 
@@ -566,6 +594,8 @@ export default function App() {
           sceneMessages,
           coachMessages,
           pendingTurn,
+          isAskingCoach,
+          coachStatus,
           isFinishing,
           startedAt: new Date(session.started_at).getTime(),
           inviteCode,

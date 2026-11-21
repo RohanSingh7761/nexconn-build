@@ -143,6 +143,8 @@ export interface SessionRow {
   turn_count: number;
   started_at: Date;
   ended_at: Date | null;
+  mode: 'ai' | 'partner';
+  partner_user_id: string | null;
 }
 
 export async function createSession(
@@ -151,13 +153,14 @@ export async function createSession(
   difficulty: 'friendly' | 'neutral' | 'tough',
   userContext: string | null,
   personaNexconnId: string,
-  coachGroupId: string
+  coachGroupId: string,
+  mode: 'ai' | 'partner' = 'ai'
 ): Promise<SessionRow> {
   const { rows } = await pool.query<SessionRow>(
-    `INSERT INTO sessions (user_id, scenario_id, difficulty, user_context, persona_nexconn_id, coach_group_id)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO sessions (user_id, scenario_id, difficulty, user_context, persona_nexconn_id, coach_group_id, mode)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING *`,
-    [userId, scenarioId, difficulty, userContext, personaNexconnId, coachGroupId]
+    [userId, scenarioId, difficulty, userContext, personaNexconnId, coachGroupId, mode]
   );
   const session = rows[0];
 
@@ -259,6 +262,15 @@ export async function updateSessionEnd(sessionId: string): Promise<SessionRow> {
     [sessionId]
   );
   return rows[0];
+}
+
+// Claims the partner seat only if it is still empty; returns false if someone else took it.
+export async function setSessionPartner(sessionId: string, userId: string): Promise<boolean> {
+  const { rowCount } = await pool.query(
+    `UPDATE sessions SET partner_user_id = $2 WHERE id = $1 AND partner_user_id IS NULL`,
+    [sessionId, userId]
+  );
+  return (rowCount ?? 0) > 0;
 }
 
 export async function incrementTurnCount(sessionId: string): Promise<void> {

@@ -68,8 +68,9 @@ export default function SessionScreen({
   const sceneMessages  = session?.sceneMessages  ?? DEMO_SCENE
   const coachMessages  = session?.coachMessages  ?? DEMO_TIPS
   const pendingTurn    = session?.pendingTurn     ?? false
-  const personaName    = scenario?.personaName    ?? 'Alex Marsh'
-  const personaRole    = scenario?.personaRole    ?? 'Hiring Manager'
+  // The API returns snake_case rows; the camelCase keys are kept for the demo data.
+  const personaName    = scenario?.persona_name ?? scenario?.personaName ?? 'Alex Marsh'
+  const personaRole    = scenario?.persona_role ?? scenario?.personaRole ?? 'Hiring Manager'
   const difficulty     = session?.difficulty      ?? 'neutral'
   const startedAt      = session?.startedAt       ?? DEMO_STARTED_AT
   const inviteCode     = session?.inviteCode

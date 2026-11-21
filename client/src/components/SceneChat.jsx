@@ -8,6 +8,7 @@ export default function SceneChat({
   pendingTurn = false,
   personaName = 'Alex',
   connectionStatus = 'connected',
+  ended = false,
   onSend,
 }) {
   const [draft, setDraft] = useState('')
@@ -24,7 +25,7 @@ export default function SceneChat({
     setDraft('')
   }
 
-  const isDisabled = pendingTurn || connectionStatus === 'disconnected'
+  const isDisabled = pendingTurn || ended || connectionStatus === 'disconnected'
 
   return (
     <div className="chat-pane" aria-label="Scene conversation">
@@ -61,7 +62,9 @@ export default function SceneChat({
         onSend={handleSend}
         disabled={isDisabled}
         placeholder={
-          isDisabled && connectionStatus !== 'connected'
+          ended
+            ? 'This session has ended'
+            : isDisabled && connectionStatus !== 'connected'
             ? 'Reconnecting…'
             : pendingTurn
               ? `${personaName} is replying…`

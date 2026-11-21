@@ -368,7 +368,16 @@ app.get('/api/sessions/:id', requireAuth, async (req: AuthenticatedRequest, res:
 
 app.get('/api/sessions/:id/transcript', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const messages = await db.getSessionMessages(getParam(req.params.id));
+    const session = await db.getSessionById(getParam(req.params.id));
+    if (!session) {
+      res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Session not found' } });
+      return;
+    }
+    let messages = await db.getSessionMessages(session.id);
+    // The partner plays the other person, so the private coach channel stays hidden from them.
+    if (session.partner_user_id === req.user!.id) {
+      messages = messages.filter((m) => m.channel === 'scene');
+    }
     res.json({ messages });
   } catch (err: any) {
     res.status(500).json({ error: { code: 'SERVER_ERROR', message: err.message } });

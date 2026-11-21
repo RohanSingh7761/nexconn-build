@@ -868,8 +868,8 @@ app.post('/api/partner-sessions/:id/join', requireAuth, async (req: Authenticate
       kind: 'system_notice',
       text: `${me.displayName || me.username} joined as ${scenario?.persona_name ?? 'partner'}.`,
     });
+    // System notices only go to the coach channel, not the scene chat
     await sendGroupText('bot_coach', session.coach_group_id, notice).catch(() => {});
-    await sendGroupText('bot_coach', session.persona_nexconn_id, notice).catch(() => {});
 
     res.json({
       sessionId: session.id,

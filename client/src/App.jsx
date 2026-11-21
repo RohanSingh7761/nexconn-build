@@ -79,11 +79,18 @@ export default function App() {
             const text = (m.text || '').trim()
             if (!text) return // Prevent empty bubbles
 
-            // The server posts a session_ended control message so the partner's composer can lock.
-            if (partnerMode && text.startsWith('{')) {
+            // Bot coach control/notice messages never belong in the scene speech bubbles
+            if (m.senderId === 'bot_coach') return
+
+            // Control & system messages (e.g. session_ended, system_notice)
+            if (text.startsWith('{')) {
               try {
-                if (JSON.parse(text).kind === 'session_ended') {
+                const parsed = JSON.parse(text)
+                if (parsed.kind === 'session_ended') {
                   setSessionEnded(true)
+                  return
+                }
+                if (parsed.kind === 'system_notice') {
                   return
                 }
               } catch {
@@ -252,7 +259,17 @@ export default function App() {
       })
       const { messages } = await api.getTranscript(sessionId)
       const sceneMsgs = messages
-        .filter((m) => m.channel === 'scene' && m.content && m.content.trim())
+        .filter((m) => {
+          if (m.channel !== 'scene' || !m.content || !m.content.trim()) return false
+          if (m.sender_type === 'coach' || m.sender_type === 'system') return false
+          if (m.content.trim().startsWith('{')) {
+            try {
+              const parsed = JSON.parse(m.content)
+              if (parsed.kind === 'system_notice' || parsed.kind === 'session_ended') return false
+            } catch {}
+          }
+          return true
+        })
         .map((m) => {
           // Mentors only watch, so they get no "mine"; the Bubble falls back to the sender type for them.
           const isMine = asPartner || sess.user_id === user.id ? m.sender_user_id === user.id : undefined

@@ -3,9 +3,9 @@ import * as api from '../lib/api'
 
 export default function AuthModal({ onLoginSuccess }) {
   const [isRegister, setIsRegister] = useState(false)
-  const [username, setUsername] = useState('afk_penguin')
-  const [displayName, setDisplayName] = useState('Rohan Singh')
-  const [password, setPassword] = useState('password123')
+  const [username, setUsername] = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -47,38 +47,6 @@ export default function AuthModal({ onLoginSuccess }) {
         <p style={{ margin: '0 0 16px', color: '#9ba1b0', fontSize: 13 }}>
           {isRegister ? 'Create an account to practice high-stakes conversations' : 'Sign in to access your practice sessions'}
         </p>
-
-        {!isRegister && (
-          <div style={{ marginBottom: 16, background: '#0e1014', border: '1px solid #282c37', borderRadius: 8, padding: 10 }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', color: '#8b949e', fontWeight: 600, marginBottom: 6 }}>
-              Quick Select Profile:
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-              <button
-                type="button"
-                onClick={() => { setUsername('afk_penguin'); setPassword('password123'); setError('') }}
-                style={{
-                  padding: '6px 8px', borderRadius: 6, border: username === 'afk_penguin' ? '1.5px solid #58a6ff' : '1px solid #30363d',
-                  background: username === 'afk_penguin' ? 'rgba(56,139,253,0.15)' : '#16181d',
-                  color: username === 'afk_penguin' ? '#58a6ff' : '#c9d1d9', fontSize: 11, cursor: 'pointer', textAlign: 'left', fontWeight: 600
-                }}
-              >
-                👤 Rohan (Learner)
-              </button>
-              <button
-                type="button"
-                onClick={() => { setUsername('not_afk_penguin'); setPassword('password123'); setError('') }}
-                style={{
-                  padding: '6px 8px', borderRadius: 6, border: username === 'not_afk_penguin' ? '1.5px solid #bc8cff' : '1px solid #30363d',
-                  background: username === 'not_afk_penguin' ? 'rgba(188,140,255,0.15)' : '#16181d',
-                  color: username === 'not_afk_penguin' ? '#bc8cff' : '#c9d1d9', fontSize: 11, cursor: 'pointer', textAlign: 'left', fontWeight: 600
-                }}
-              >
-                👥 Not Rohan (Partner)
-              </button>
-            </div>
-          </div>
-        )}
 
         {error && (
           <div style={{

@@ -7,6 +7,13 @@ import ScorecardModal from './components/ScorecardModal'
 import AuthModal from './components/AuthModal'
 import Spike from './Spike'
 
+// 'learner' owns the session, 'partner' is the human counterpart in partner mode, anyone else is a mentor.
+function roleOf(session, user) {
+  if (!session || !user) return null
+  if (session.user_id === user.id) return 'learner'
+  return session.partner_user_id === user.id ? 'partner' : 'mentor'
+}
+
 export default function App() {
   const [viewSpike, setViewSpike] = useState(import.meta.env.VITE_SPIKE === '1' || import.meta.env.VITE_SPIKE === 'true')
   const [user, setUser] = useState(null)
@@ -23,6 +30,7 @@ export default function App() {
   const [connectionStatus, setConnectionStatus] = useState('disconnected')
   const [inviteCode, setInviteCode] = useState(null)
   const [inviteExpiry, setInviteExpiry] = useState(null)
+  const [sessionEnded, setSessionEnded] = useState(false) // partner mode: the interviewee finished the session
 
   // Scorecard modal
   const [scorecard, setScorecard] = useState(null)
@@ -61,15 +69,41 @@ export default function App() {
         })
 
         unsubMsg = nx.onMessage((m) => {
+          const role = roleOf(session, user)
+          const partnerMode = session.mode === 'partner'
+
           // If message is in scene channel
           if (m.channel.targetId === channels.scene.targetId) {
             const text = (m.text || '').trim()
             if (!text) return // Prevent empty bubbles
 
+            // The server posts a session_ended control message so the partner's composer can lock.
+            if (partnerMode && text.startsWith('{')) {
+              try {
+                if (JSON.parse(text).kind === 'session_ended') {
+                  setSessionEnded(true)
+                  return
+                }
+              } catch {
+                // ordinary text that happens to start with a brace
+              }
+            }
+
+            const isMine = m.senderId === user.nexconnUserId
+            // Partner mode: the owner is always 'learner' and the other human 'persona', on every screen.
+            const senderType = partnerMode
+              ? (isMine === (role === 'learner') ? 'learner' : 'persona')
+              : (isMine ? 'learner' : 'persona')
+            const senderName = isMine
+              ? 'You'
+              : partnerMode && role === 'partner'
+                ? 'Interviewee'
+                : (scenario?.persona_name || 'Persona')
+
             setSceneMessages((prev) => {
-              // Deduplicate on UID or exact content & sender
-              const senderType = m.senderId === user.nexconnUserId ? 'learner' : 'persona'
-              if (prev.some((x) => x.uid === m.uid || (x.content === text && x.senderType === senderType))) {
+              // Deduplicate on UID. AI mode also dedupes on content, since the HTTP fallback adds the same reply
+              // under a different uid; humans can legitimately repeat themselves, so partner mode does not.
+              if (prev.some((x) => x.uid === m.uid || (!partnerMode && x.content === text && x.senderType === senderType))) {
                 return prev
               }
               return [
@@ -77,7 +111,8 @@ export default function App() {
                 {
                   uid: m.uid,
                   senderType,
-                  senderName: senderType === 'learner' ? 'You' : (scenario?.persona_name || 'Persona'),
+                  senderName,
+                  isMine,
                   content: text,
                   createdAt: m.sentAt,
                 },
@@ -85,8 +120,8 @@ export default function App() {
             })
           }
 
-          // If message is in coach channel
-          if (m.channel.targetId === channels.coach.targetId) {
+          // If message is in coach channel (the partner has none)
+          if (channels.coach && m.channel.targetId === channels.coach.targetId) {
             let parsed = null
             try {
               parsed = typeof m.text === 'string' ? JSON.parse(m.text) : m.text
@@ -172,6 +207,9 @@ export default function App() {
     setScorecard(null)
     setShowScorecard(false)
     setIsFinishing(false)
+    setSessionEnded(false)
+    setInviteCode(null) // don't carry a previous session's code into this one
+    setInviteExpiry(null)
 
     const initialScene = []
     if (openingMessage && openingMessage.content && openingMessage.content.trim()) {
@@ -188,32 +226,53 @@ export default function App() {
       {
         uid: 'sys-start',
         kind: 'system_notice',
-        text: `Practice started: "${newScenario.title}". The AI coach will whisper tips here after each of your messages.`,
+        text: newSession.mode === 'partner'
+          ? `Practice started: "${newScenario.title}". Share the invite code so your partner can join as ${newScenario.persona_name}. The AI coach will whisper tips here after each of your messages.`
+          : `Practice started: "${newScenario.title}". The AI coach will whisper tips here after each of your messages.`,
       },
     ])
   }
 
   // Join as mentor via invite
-  const handleJoinInvite = async (sessionId, coachGroupId) => {
+  const handleJoinInvite = async (sessionId, coachGroupId, joinRes) => {
     try {
-      const { session: sess, scenario: sc } = await api.getSession(sessionId)
+      const { session: sess, scenario: sc, channels: ch } = await api.getSession(sessionId)
+      const asPartner = joinRes?.role === 'partner'
       setSession(sess)
       setScenario(sc)
+      setSessionEnded(sess.status === 'completed')
+      setInviteCode(null)
+      setInviteExpiry(null)
       setChannels({
-        scene: { type: 'direct', targetId: sess.persona_nexconn_id },
-        coach: { type: 'group', targetId: coachGroupId },
+        scene: ch.scene,
+        // The partner is never in the private coach channel.
+        coach: asPartner ? null : { type: 'group', targetId: coachGroupId },
       })
       const { messages } = await api.getTranscript(sessionId)
       const sceneMsgs = messages
         .filter((m) => m.channel === 'scene' && m.content && m.content.trim())
-        .map((m) => ({
-          uid: m.nexconn_message_uid || String(m.id),
-          senderType: m.sender_type,
-          senderName: m.sender_type === 'learner' ? 'Learner' : sc.persona_name,
-          content: m.content.trim(),
-          createdAt: new Date(m.created_at).getTime(),
-        }))
+        .map((m) => {
+          // Mentors only watch, so they get no "mine"; the Bubble falls back to the sender type for them.
+          const isMine = asPartner || sess.user_id === user.id ? m.sender_user_id === user.id : undefined
+          return {
+            uid: m.nexconn_message_uid || String(m.id),
+            senderType: m.sender_type,
+            senderName: isMine
+              ? 'You'
+              : m.sender_type === 'learner'
+                ? (asPartner ? 'Interviewee' : 'Learner')
+                : sc.persona_name,
+            isMine,
+            content: m.content.trim(),
+            createdAt: new Date(m.created_at).getTime(),
+          }
+        })
       setSceneMessages(sceneMsgs)
+
+      if (asPartner) {
+        setCoachMessages([])
+        return
+      }
 
       const coachMsgs = messages
         .filter((m) => m.channel === 'coach' && m.content && m.content.trim())
@@ -248,8 +307,11 @@ export default function App() {
   // Learner sends a scene turn
   const handleSendSceneMessage = async (text) => {
     const trimmed = text.trim()
-    if (!session || !channels || pendingTurn || !trimmed) return
-    setPendingTurn(true)
+    if (!session || !channels || pendingTurn || sessionEnded || !trimmed) return
+    const partnerMode = session.mode === 'partner'
+    const role = roleOf(session, user)
+    // Partner mode has no AI reply to wait for, so no "typing…" state.
+    if (!partnerMode) setPendingTurn(true)
 
     let uid = null
     try {
@@ -262,8 +324,9 @@ export default function App() {
     // Add locally to scene UI
     const localMsg = {
       uid: uid || `local-${Date.now()}`,
-      senderType: 'learner',
+      senderType: partnerMode && role === 'partner' ? 'persona' : 'learner',
       senderName: 'You',
+      isMine: true,
       content: trimmed,
       createdAt: Date.now(),
     }
@@ -481,12 +544,16 @@ export default function App() {
     )
   }
 
+  const role = roleOf(session, user)
+
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <SessionScreen
         session={{
           ...session,
-          isMentor: session.user_id !== user.id,
+          isMentor: role === 'mentor',
+          myRole: role,
+          sessionEnded,
           sceneMessages,
           coachMessages,
           pendingTurn,
@@ -501,6 +568,7 @@ export default function App() {
         onAskCoach={handleAskCoach}
         onFinish={handleFinish}
         onInvite={handleInvite}
+        onLeave={() => setSession(null)}
       />
 
       {showScorecard && (

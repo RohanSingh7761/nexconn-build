@@ -18,9 +18,13 @@ export default function SessionHeader({
   connectionStatus = 'connected',
   startedAt,
   isFinishing = false,
+  mode = 'ai',
+  myRole = 'learner',
   onInvite,
   onFinish,
 }) {
+  const isPartnerMode = mode === 'partner'
+  const isPartner = isPartnerMode && myRole === 'partner'
   const [mountedAt] = useState(Date.now)
   const [now, setNow] = useState(Date.now)
   useEffect(() => {
@@ -52,12 +56,20 @@ export default function SessionHeader({
             <div className="measured" style={{ fontSize: '11px' }}>{personaRole}</div>
           )}
         </div>
-        <span className={`chip ${difficultyMap[difficulty] ?? ''}`} style={{ marginLeft: '4px' }}>
-          {difficulty}
-        </span>
-        <span className="chip chip--cool" style={{ marginLeft: '2px', fontSize: '10px' }}>
-          AI
-        </span>
+        {isPartnerMode ? (
+          <span className="chip chip--cool" style={{ marginLeft: '4px', fontSize: '10px' }}>
+            {isPartner ? 'You play this role' : 'Live partner'}
+          </span>
+        ) : (
+          <>
+            <span className={`chip ${difficultyMap[difficulty] ?? ''}`} style={{ marginLeft: '4px' }}>
+              {difficulty}
+            </span>
+            <span className="chip chip--cool" style={{ marginLeft: '2px', fontSize: '10px' }}>
+              AI
+            </span>
+          </>
+        )}
       </div>
 
       <div className="session-header__controls">
@@ -72,37 +84,42 @@ export default function SessionHeader({
           {formatElapsed(elapsed)}
         </span>
 
-        <button
-          type="button"
-          className="btn btn--ghost btn--icon"
-          onClick={onInvite}
-          title="Invite a mentor"
-          aria-label="Invite a mentor"
-        >
-          <UserPlus size={16} aria-hidden="true" />
-          <span className="btn--label" style={{ marginLeft: '4px' }}>Invite</span>
-        </button>
+        {/* The partner only chats; inviting and ending belong to the interviewee. */}
+        {!isPartner && (
+          <>
+            <button
+              type="button"
+              className="btn btn--ghost btn--icon"
+              onClick={onInvite}
+              title={isPartnerMode ? 'Invite your partner' : 'Invite a mentor'}
+              aria-label={isPartnerMode ? 'Invite your partner' : 'Invite a mentor'}
+            >
+              <UserPlus size={16} aria-hidden="true" />
+              <span className="btn--label" style={{ marginLeft: '4px' }}>Invite</span>
+            </button>
 
-        <button
-          type="button"
-          className="btn"
-          disabled={isFinishing}
-          onClick={onFinish}
-          aria-label="End this session"
-          style={{ opacity: isFinishing ? 0.7 : 1, cursor: isFinishing ? 'wait' : 'pointer' }}
-        >
-          {isFinishing ? (
-            <>
-              <Loader2 size={14} className="animate-spin" aria-hidden="true" />
-              <span>Evaluating...</span>
-            </>
-          ) : (
-            <>
-              <Square size={14} aria-hidden="true" />
-              <span>Finish</span>
-            </>
-          )}
-        </button>
+            <button
+              type="button"
+              className="btn"
+              disabled={isFinishing}
+              onClick={onFinish}
+              aria-label="End this session"
+              style={{ opacity: isFinishing ? 0.7 : 1, cursor: isFinishing ? 'wait' : 'pointer' }}
+            >
+              {isFinishing ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+                  <span>Evaluating...</span>
+                </>
+              ) : (
+                <>
+                  <Square size={14} aria-hidden="true" />
+                  <span>Finish</span>
+                </>
+              )}
+            </button>
+          </>
+        )}
       </div>
     </header>
   )

@@ -42,6 +42,9 @@ CREATE TABLE IF NOT EXISTS sessions (
   ended_at           timestamptz
 );
 CREATE INDEX IF NOT EXISTS sessions_user_idx ON sessions(user_id, started_at DESC);
+-- Partner mode: a human plays the counterpart. persona_nexconn_id then holds the scene group id.
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS mode text NOT NULL DEFAULT 'ai' CHECK (mode IN ('ai','partner'));
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS partner_user_id uuid REFERENCES users(id);
 
 CREATE TABLE IF NOT EXISTS session_members (
   session_id uuid NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,

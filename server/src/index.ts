@@ -23,7 +23,14 @@ import * as db from './db/queries.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
-const JWT_SECRET = process.env.JWT_SECRET || 'rehearsal-secret-key-development';
+// Secrets and credentials come only from server/.env. Fail at startup rather than fall back to a public default.
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`Missing required environment variable ${name}. Set it in server/.env.`);
+  return value;
+}
+
+const JWT_SECRET = requireEnv('JWT_SECRET');
 
 // Middleware
 app.use(helmet());
@@ -32,10 +39,10 @@ app.use(express.json({ limit: '1mb' }));
 
 // Init Nexconn SDK
 initNexconnServer({
-  appKey: process.env.NEXCONN_APP_KEY || '6tnym1br6ia37',
-  appSecret: process.env.NEXCONN_APP_SECRET || 'y39k0InBtQUZ',
-  primaryDomain: process.env.NEXCONN_PRIMARY_API_DOMAIN || 'api.sg-light-api.com',
-  secondaryDomain: process.env.NEXCONN_SECONDARY_API_DOMAIN || 'api-b.sg-light-api.com',
+  appKey: requireEnv('NEXCONN_APP_KEY'),
+  appSecret: requireEnv('NEXCONN_APP_SECRET'),
+  primaryDomain: requireEnv('NEXCONN_PRIMARY_API_DOMAIN'),
+  secondaryDomain: requireEnv('NEXCONN_SECONDARY_API_DOMAIN'),
 });
 
 // Startup: Register bot_coach in Nexconn
@@ -51,6 +58,11 @@ initNexconnServer({
 function getParam(param: string | string[] | undefined): string {
   if (!param) return '';
   return Array.isArray(param) ? param[0] : param;
+}
+
+// The scene is a direct channel with the AI persona, or a group between two humans in partner mode.
+function sceneChannel(session: db.SessionRow) {
+  return { type: session.mode === 'partner' ? 'group' : 'direct', targetId: session.persona_nexconn_id };
 }
 
 // Auth Token Helper
@@ -242,7 +254,11 @@ app.post('/api/scenarios/custom', requireAuth, async (req: AuthenticatedRequest,
 app.post('/api/sessions', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = req.user!;
-    const { scenarioId, difficulty = 'neutral', userContext } = req.body;
+    const { scenarioId, difficulty = 'neutral', userContext, mode = 'ai' } = req.body;
+    if (mode !== 'ai' && mode !== 'partner') {
+      res.status(400).json({ error: { code: 'BAD_REQUEST', message: "mode must be 'ai' or 'partner'" } });
+      return;
+    }
 
     const scenario = await db.getScenarioById(scenarioId);
     if (!scenario) {
@@ -250,13 +266,25 @@ app.post('/api/sessions', requireAuth, async (req: AuthenticatedRequest, res: Re
       return;
     }
 
-    const personaNexconnId = `persona_${scenario.id}_${Date.now().toString(36)}`;
-    const coachGroupId = `coach_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    const suffix = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    // In partner mode this column holds the scene group id (a human plays the counterpart).
+    const personaNexconnId = mode === 'partner' ? `scene_${suffix}` : `persona_${scenario.id}_${Date.now().toString(36)}`;
+    const coachGroupId = `coach_${suffix}`;
 
-    // 1. Register persona bot on Nexconn
-    await issueToken(personaNexconnId, scenario.persona_name, scenario.persona_avatar_url || undefined).catch((e) =>
-      console.warn('persona register warn:', e.message)
-    );
+    if (mode === 'partner') {
+      // 1a. Scene group: owner now, the partner joins later via invite. bot_coach is a member so it can post the end notice.
+      await createCoachGroup(
+        personaNexconnId,
+        `Scene: ${scenario.title}`,
+        user.nexconnUserId,
+        [user.nexconnUserId, 'bot_coach']
+      ).catch((e) => console.warn('scene group create warn:', e.message));
+    } else {
+      // 1. Register persona bot on Nexconn
+      await issueToken(personaNexconnId, scenario.persona_name, scenario.persona_avatar_url || undefined).catch((e) =>
+        console.warn('persona register warn:', e.message)
+      );
+    }
 
     // 2. Create coach group channel on Nexconn with learner and bot_coach
     await createCoachGroup(
@@ -273,13 +301,14 @@ app.post('/api/sessions', requireAuth, async (req: AuthenticatedRequest, res: Re
       difficulty,
       userContext || null,
       personaNexconnId,
-      coachGroupId
+      coachGroupId,
+      mode
     );
 
     let openingMessage: any = null;
 
-    // 4. Send opening message if scenario has one
-    if (scenario.opening_message) {
+    // 4. Send opening message if scenario has one (AI mode only; in partner mode a human speaks first)
+    if (mode === 'ai' && scenario.opening_message) {
       const delivery = await sendDirectText(
         personaNexconnId,
         user.nexconnUserId,
@@ -301,7 +330,7 @@ app.post('/api/sessions', requireAuth, async (req: AuthenticatedRequest, res: Re
     res.json({
       session,
       channels: {
-        scene: { type: 'direct', targetId: personaNexconnId },
+        scene: sceneChannel(session),
         coach: { type: 'group', targetId: coachGroupId },
       },
       opening: openingMessage,
@@ -328,13 +357,22 @@ app.get('/api/sessions/:id', requireAuth, async (req: AuthenticatedRequest, res:
       return;
     }
     const scenario = await db.getScenarioById(session.scenario_id);
+    const myRole =
+      session.user_id === req.user!.id ? 'learner' : session.partner_user_id === req.user!.id ? 'partner' : 'mentor';
+    // The persona's hidden goals are only for the human playing them, never the interviewee or a mentor.
+    let visibleScenario: Partial<db.ScenarioRow> | null = scenario;
+    if (scenario && myRole !== 'partner') {
+      const { persona_private_brief, ...rest } = scenario;
+      visibleScenario = rest;
+    }
     res.json({
       session,
-      scenario,
+      scenario: visibleScenario,
       channels: {
-        scene: { type: 'direct', targetId: session.persona_nexconn_id },
+        scene: sceneChannel(session),
         coach: { type: 'group', targetId: session.coach_group_id },
       },
+      myRole,
     });
   } catch (err: any) {
     res.status(500).json({ error: { code: 'SERVER_ERROR', message: err.message } });
@@ -343,7 +381,16 @@ app.get('/api/sessions/:id', requireAuth, async (req: AuthenticatedRequest, res:
 
 app.get('/api/sessions/:id/transcript', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const messages = await db.getSessionMessages(getParam(req.params.id));
+    const session = await db.getSessionById(getParam(req.params.id));
+    if (!session) {
+      res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Session not found' } });
+      return;
+    }
+    let messages = await db.getSessionMessages(session.id);
+    // The partner plays the other person, so the private coach channel stays hidden from them.
+    if (session.partner_user_id === req.user!.id) {
+      messages = messages.filter((m) => m.channel === 'scene');
+    }
     res.json({ messages });
   } catch (err: any) {
     res.status(500).json({ error: { code: 'SERVER_ERROR', message: err.message } });
@@ -353,6 +400,16 @@ app.get('/api/sessions/:id/transcript', requireAuth, async (req: AuthenticatedRe
 /* ─────────────────────────────────────────────────────────────────────────────
    TURNS & CHAT (THE CORE AI LOOP)
 ───────────────────────────────────────────────────────────────────────────── */
+
+// Sends a coach tip into the private coach group as bot_coach and stores it. Nexconn failures never lose the DB write.
+async function postCoachTip(session: db.SessionRow, learnerMsgId: number, tip: object) {
+  const payload = JSON.stringify(tip);
+  const delivery = await sendGroupText('bot_coach', session.coach_group_id, payload).catch((e) => {
+    console.warn('[turns] Nexconn coach group error:', e.message);
+    return null;
+  });
+  return db.saveMessage(session.id, 'coach', 'coach', null, payload, tip, learnerMsgId, delivery?.messageUid || null);
+}
 
 app.post('/api/sessions/:id/turns', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -375,6 +432,44 @@ app.post('/api/sessions/:id/turns', requireAuth, async (req: AuthenticatedReques
     const scenario = await db.getScenarioById(session.scenario_id);
     if (!scenario) {
       res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Scenario not found' } });
+      return;
+    }
+
+    // Partner mode: two humans talk; the AI only whispers a tip to the interviewee. No persona reply.
+    if (session.mode === 'partner') {
+      const isOwner = session.user_id === req.user!.id;
+      const isPartner = session.partner_user_id === req.user!.id;
+      if (!isOwner && !isPartner) {
+        res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Only the interviewee and the partner can send messages' } });
+        return;
+      }
+      // The partner plays the counterpart, so their messages are stored as 'persona' for the coach and scorecard.
+      const msg = await db.saveMessage(
+        session.id,
+        'scene',
+        isOwner ? 'learner' : 'persona',
+        req.user!.id,
+        text.trim(),
+        {},
+        null,
+        nexconnMessageUid || null
+      );
+      if (isPartner) {
+        res.json({ messageId: msg.id });
+        return;
+      }
+      const history = await db.getSceneMessages(session.id, 15);
+      const coachRes = await generateCoachTip(scenario, history, text.trim()).catch((err) => {
+        console.error('[turns] Coach LLM error:', err);
+        return null;
+      });
+      const coachMsg = coachRes ? await postCoachTip(session, msg.id, coachRes) : null;
+      await db.incrementTurnCount(session.id);
+      res.json({
+        learnerMessageId: msg.id,
+        persona: null,
+        coach: coachRes ? { messageId: coachMsg?.id, ...coachRes } : null,
+      });
       return;
     }
 
@@ -428,29 +523,7 @@ app.post('/api/sessions/:id/turns', requireAuth, async (req: AuthenticatedReques
     );
 
     // 6. If coach tip was generated, send via Nexconn SDK as bot_coach into group channel
-    let coachMsg: any = null;
-    if (coachRes) {
-      const coachPayload = JSON.stringify(coachRes);
-      const coachDelivery = await sendGroupText(
-        'bot_coach',
-        session.coach_group_id,
-        coachPayload
-      ).catch((e) => {
-        console.warn('[turns] Nexconn coach group error:', e.message);
-        return null;
-      });
-
-      coachMsg = await db.saveMessage(
-        session.id,
-        'coach',
-        'coach',
-        null,
-        coachPayload,
-        coachRes,
-        learnerMsg.id,
-        coachDelivery?.messageUid || null
-      );
-    }
+    const coachMsg = coachRes ? await postCoachTip(session, learnerMsg.id, coachRes) : null;
 
     await db.incrementTurnCount(session.id);
     res.json({
@@ -551,14 +624,24 @@ app.post('/api/sessions/:id/end', requireAuth, async (req: AuthenticatedRequest,
       return;
     }
 
-    await db.updateSessionEnd(session.id);
+    // In partner mode only the interviewee ends the session; the partner just gets locked out.
+    if (session.mode === 'partner' && session.user_id !== req.user!.id) {
+      res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Only the interviewee can end this session' } });
+      return;
+    }
+
+    const endedSession = await db.updateSessionEnd(session.id);
+    if (session.mode === 'partner' && session.status !== 'completed') {
+      // Tells the partner's client to lock the scene composer.
+      await sendGroupText('bot_coach', session.persona_nexconn_id, JSON.stringify({ v: 1, kind: 'session_ended' })).catch(() => {});
+    }
     const scenario = await db.getScenarioById(session.scenario_id);
     const messages = await db.getSessionMessages(session.id);
 
     const learnerMessages = messages.filter((m) => m.sender_type === 'learner');
     if (learnerMessages.length === 0) {
       res.json({
-        session: { ...session, status: 'completed' },
+        session: endedSession,
         scorecard: null,
         message: 'No messages were sent in this session. No scorecard was generated.',
       });
@@ -589,7 +672,7 @@ app.post('/api/sessions/:id/end', requireAuth, async (req: AuthenticatedRequest,
       await sendGroupText('bot_coach', session.coach_group_id, noticePayload).catch(() => {});
     }
 
-    res.json({ session, scorecard });
+    res.json({ session: endedSession, scorecard });
   } catch (err: any) {
     res.status(500).json({ error: { code: 'SERVER_ERROR', message: err.message } });
   }
@@ -637,7 +720,32 @@ app.post('/api/invites/:code/join', requireAuth, async (req: AuthenticatedReques
       return;
     }
 
-    await db.joinSessionWithInvite(invite.session_id, req.user!.id, invite.code);
+    const me = req.user!;
+    const sceneTarget = { type: 'group', targetId: invite.persona_nexconn_id };
+
+    // Partner mode: the first joiner (not the owner) takes the interviewer seat. Reloading as the partner is idempotent.
+    if (invite.mode === 'partner' && invite.owner_id !== me.id) {
+      const alreadyPartner = invite.partner_user_id === me.id;
+      const claimed = alreadyPartner || (!invite.partner_user_id && (await db.setSessionPartner(invite.session_id, me.id)));
+      if (claimed) {
+        if (!alreadyPartner) {
+          await joinCoachGroup(invite.persona_nexconn_id, [me.nexconnUserId]).catch(() => {});
+          const scenario = await db.getScenarioById(invite.scenario_id);
+          const notice = JSON.stringify({
+            v: 1,
+            kind: 'system_notice',
+            text: `${me.displayName} joined as ${scenario?.persona_name ?? 'the partner'}.`,
+          });
+          await sendGroupText('bot_coach', invite.coach_group_id, notice).catch(() => {});
+        }
+        // The partner never sees the private coach channel, so only the scene is returned.
+        res.json({ sessionId: invite.session_id, role: 'partner', channels: { scene: sceneTarget } });
+        return;
+      }
+      // Seat already taken by someone else: fall through and join as a mentor.
+    }
+
+    await db.joinSessionWithInvite(invite.session_id, me.id, invite.code);
 
     // Join mentor's Nexconn user to coach group channel
     await joinCoachGroup(invite.coach_group_id, [req.user!.nexconnUserId]).catch(() => {});
@@ -650,7 +758,7 @@ app.post('/api/invites/:code/join', requireAuth, async (req: AuthenticatedReques
     });
     await sendGroupText('bot_coach', invite.coach_group_id, notice).catch(() => {});
 
-    res.json({ sessionId: invite.session_id, coachGroupId: invite.coach_group_id });
+    res.json({ sessionId: invite.session_id, coachGroupId: invite.coach_group_id, role: 'mentor' });
   } catch (err: any) {
     res.status(500).json({ error: { code: 'SERVER_ERROR', message: err.message } });
   }

@@ -449,11 +449,8 @@ input, textarea {
   scroll-behavior: smooth;
 }
 
-/* tip card */
-.tip-card {
-  background: var(--color-paper-2);
-  color: var(--color-ink-2);
-  border: var(--rule-hair) solid var(--color-rule);
+/* coach channel items */
+.coach-item {
   border-radius: var(--radius-card);
   padding: var(--space-md);
   display: flex;
@@ -461,14 +458,145 @@ input, textarea {
   gap: var(--space-sm);
   transition: border-color var(--dur-short) var(--ease-out);
 }
+
+/* AI coach tip card */
+.coach-item--tip,
+.tip-card {
+  background: var(--color-paper-2);
+  color: var(--color-ink-2);
+  border: var(--rule-hair) solid var(--color-rule);
+}
+.coach-item--tip:hover,
 .tip-card:hover {
   border-color: var(--color-rule-2);
 }
 
+/* AI coach guidance / answer */
+.coach-item--answer {
+  background: color-mix(in oklab, var(--color-cool) 8%, var(--color-paper-2));
+  border: var(--rule-hair) solid color-mix(in oklab, var(--color-cool) 30%, var(--color-rule));
+  border-left: 3px solid var(--color-cool);
+  color: var(--color-ink);
+}
+
+/* Human Mentor Note - Rich Violet Accent with high contrast differentiation */
+.coach-item--mentor {
+  background: color-mix(in oklab, #8b5cf6 10%, var(--color-paper-2));
+  border: 1px solid color-mix(in oklab, #8b5cf6 35%, var(--color-rule));
+  border-left: 3.5px solid #a78bfa;
+  box-shadow: 0 2px 10px rgba(139, 92, 246, 0.08);
+}
+.coach-item--mentor:hover {
+  border-color: color-mix(in oklab, #8b5cf6 55%, var(--color-rule));
+}
+
+/* Learner note / question in coach channel */
+.coach-item--learner {
+  background: color-mix(in oklab, var(--color-accent) 8%, var(--color-paper-2));
+  border: 1px solid color-mix(in oklab, var(--color-accent) 25%, var(--color-rule));
+  border-left: 3px solid var(--color-accent);
+}
+
+/* Headers & Meta inside coach cards */
+.mentor-card__header,
+.coach-card__header,
+.learner-card__header,
 .tip-card__meta {
   display: flex;
   align-items: center;
   gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.mentor-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: color-mix(in oklab, #8b5cf6 25%, transparent);
+  color: #c4b5fd;
+  border: 1px solid color-mix(in oklab, #8b5cf6 40%, transparent);
+  border-radius: var(--radius-pill);
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.mentor-card__sender {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: #e9d5ff;
+}
+
+.mentor-card__text {
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.learner-badge {
+  display: inline-flex;
+  align-items: center;
+  background: color-mix(in oklab, var(--color-accent) 25%, transparent);
+  color: var(--color-accent);
+  border: 1px solid color-mix(in oklab, var(--color-accent) 40%, transparent);
+  border-radius: var(--radius-pill);
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.learner-card__text {
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.coach-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: color-mix(in oklab, var(--color-cool) 20%, transparent);
+  color: var(--color-cool);
+  border-radius: var(--radius-pill);
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.coach-badge--subtle {
+  background: transparent;
+  color: var(--color-muted);
+  border: 1px solid var(--color-rule);
+}
+
+.coach-card__text {
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.coach-item__time {
+  font-family: var(--font-outlier);
+  font-size: 11px;
+  color: var(--color-muted);
+  margin-left: auto;
+}
+
+.chip--mentor {
+  background: color-mix(in oklab, #8b5cf6 20%, transparent);
+  color: #c4b5fd;
+  border-color: color-mix(in oklab, #8b5cf6 40%, transparent);
 }
 
 .tip-card__text {
@@ -477,6 +605,12 @@ input, textarea {
   color: var(--color-ink-2);
   overflow-wrap: break-word;
   min-width: 0;
+}
+
+.tip-card__rewrite-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
 }
 
 .tip-card__rewrite {
@@ -497,6 +631,8 @@ input, textarea {
   font-size: 11px;
   color: var(--color-muted);
   font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 /* mentor bubble inside coach panel */

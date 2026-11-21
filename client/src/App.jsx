@@ -96,25 +96,52 @@ export default function App() {
                 } catch {}
               }
             } catch {
-              parsed = { text: m.text, kind: 'coach_tip' }
+              parsed = null
             }
 
-            const tipText = (parsed.text || parsed.tip || parsed.advice || m.text || '').trim()
+            const tipText = (parsed?.text || parsed?.tip || parsed?.advice || m.text || '').trim()
             if (!tipText) return // Prevent empty boxes
 
+            const isBot = m.senderId === 'bot_coach'
+            const isMe = m.senderId === user.nexconnUserId
+            const isSessionOwner = user.id === session.user_id
+
+            let senderType = parsed?.senderType || (isBot ? 'coach' : (isSessionOwner ? 'mentor' : (m.senderId === session.user_id ? 'learner' : 'mentor')))
+            if (isBot) senderType = 'coach'
+            else if (isMe) senderType = isSessionOwner ? 'learner' : 'mentor'
+
+            let kind = parsed?.kind
+            if (!kind) {
+              if (senderType === 'coach') kind = 'coach_tip'
+              else if (senderType === 'mentor') kind = 'mentor_note'
+              else kind = 'learner_question'
+            }
+
+            let senderName = 'Mentor'
+            if (senderType === 'coach') {
+              senderName = 'Coach (AI)'
+            } else if (isMe) {
+              senderName = 'You'
+            } else if (parsed?.senderName) {
+              senderName = parsed.senderName
+            } else if (senderType === 'learner') {
+              senderName = 'Learner'
+            }
+
             setCoachMessages((prev) => {
-              if (prev.some((x) => x.uid === m.uid || (x.text && x.text === tipText))) return prev
+              if (prev.some((x) => x.uid === m.uid || (x.text === tipText && x.senderType === senderType))) return prev
               return [
                 ...prev,
                 {
                   uid: m.uid,
-                  kind: parsed.kind || 'coach_tip',
-                  category: parsed.category || 'clarity',
-                  sentiment: parsed.sentiment || 'neutral',
+                  kind,
+                  senderType,
+                  category: parsed?.category || null,
+                  sentiment: parsed?.sentiment || null,
                   text: tipText,
-                  rewrite: parsed.rewrite || null,
-                  senderName: m.senderId === 'bot_coach' ? 'Coach (AI)' : 'Mentor',
-                  createdAt: m.sentAt,
+                  rewrite: parsed?.rewrite || null,
+                  senderName,
+                  createdAt: m.sentAt || Date.now(),
                 },
               ]
             })
@@ -187,6 +214,32 @@ export default function App() {
           createdAt: new Date(m.created_at).getTime(),
         }))
       setSceneMessages(sceneMsgs)
+
+      const coachMsgs = messages
+        .filter((m) => m.channel === 'coach' && m.content && m.content.trim())
+        .map((m) => {
+          let parsed = null
+          try {
+            parsed = JSON.parse(m.content)
+          } catch {
+            parsed = { text: m.content }
+          }
+          const text = (parsed.text || parsed.tip || parsed.advice || m.content || '').trim()
+          return {
+            uid: m.nexconn_message_uid || String(m.id),
+            kind: parsed.kind || (m.sender_type === 'mentor' ? 'mentor_note' : (m.sender_type === 'coach' ? 'coach_tip' : 'learner_question')),
+            senderType: m.sender_type,
+            category: parsed.category || null,
+            sentiment: parsed.sentiment || null,
+            text,
+            rewrite: parsed.rewrite || null,
+            senderName: m.sender_type === 'mentor'
+              ? (m.metadata?.senderName || 'Mentor')
+              : (m.sender_type === 'coach' ? 'Coach (AI)' : 'Learner'),
+            createdAt: new Date(m.created_at).getTime(),
+          }
+        })
+      setCoachMessages(coachMsgs)
     } catch (err) {
       alert(`Join failed: ${err.message}`)
     }
@@ -249,7 +302,8 @@ export default function App() {
               {
                 uid: `c-${res.coach.messageId}`,
                 kind: 'coach_tip',
-                category: res.coach.category || 'clarity',
+                senderType: 'coach',
+                category: res.coach.category || null,
                 sentiment: res.coach.sentiment || 'improve',
                 text: coachText,
                 rewrite: res.coach.rewrite || null,
@@ -267,14 +321,27 @@ export default function App() {
     }
   }
 
-  // Learner asks coach a question in Coach channel
+  // Learner asks coach a question or Mentor posts live advice in Coach channel
   const handleAskCoach = async (text) => {
     const trimmed = text.trim()
     if (!session || !channels || !trimmed) return
 
+    const isLearner = session.user_id === user.id
+    const senderType = isLearner ? 'learner' : 'mentor'
+    const kind = isLearner ? 'learner_question' : 'mentor_note'
+    const senderName = isLearner ? 'You' : (user.displayName || 'Mentor')
+
+    const messagePayload = {
+      v: 1,
+      kind,
+      senderType,
+      senderName: user.displayName || (isLearner ? 'Learner' : 'Mentor'),
+      text: trimmed,
+    }
+
     let uid = null
     try {
-      const delivery = await nx.sendText(channels.coach, trimmed)
+      const delivery = await nx.sendText(channels.coach, JSON.stringify(messagePayload))
       uid = delivery.uid
     } catch (err) {
       console.warn('Nexconn coach send warn:', err)
@@ -284,7 +351,8 @@ export default function App() {
       ...prev,
       {
         uid: uid || `local-coach-${Date.now()}`,
-        kind: 'coach_question',
+        kind,
+        senderType,
         text: trimmed,
         senderName: 'You',
         createdAt: Date.now(),
@@ -307,6 +375,7 @@ export default function App() {
             {
               uid: `ans-${res.coachReply.messageId}`,
               kind: 'coach_answer',
+              senderType: 'coach',
               text: answer,
               senderName: 'Coach (AI)',
               createdAt: Date.now(),
@@ -417,6 +486,7 @@ export default function App() {
       <SessionScreen
         session={{
           ...session,
+          isMentor: session.user_id !== user.id,
           sceneMessages,
           coachMessages,
           pendingTurn,

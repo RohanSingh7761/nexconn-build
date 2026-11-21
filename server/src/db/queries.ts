@@ -343,3 +343,14 @@ export async function joinSessionWithInvite(sessionId: string, userId: string, c
     [code]
   );
 }
+
+export async function getSessionMemberRole(sessionId: string, userId: string): Promise<'learner' | 'mentor' | null> {
+  const { rows } = await pool.query<{ role: string }>(
+    'SELECT role FROM session_members WHERE session_id = $1 AND user_id = $2',
+    [sessionId, userId]
+  );
+  if (rows.length > 0 && rows[0].role) {
+    return rows[0].role as 'learner' | 'mentor';
+  }
+  return null;
+}

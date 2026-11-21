@@ -476,21 +476,34 @@ app.post('/api/sessions/:id/coach-channel/messages', requireAuth, async (req: Au
       return;
     }
 
-    const senderType = req.user!.role === 'mentor' ? 'mentor' : 'learner';
+    const isOwner = session.user_id === req.user!.id;
+    let senderType: 'learner' | 'mentor' = isOwner ? 'learner' : 'mentor';
+
+    if (!isOwner) {
+      senderType = 'mentor';
+    } else {
+      const memberRole = await db.getSessionMemberRole(session.id, req.user!.id);
+      if (memberRole === 'mentor') {
+        senderType = 'mentor';
+      }
+    }
+
+    const senderName = req.user!.displayName || (senderType === 'mentor' ? 'Mentor' : 'Learner');
+
     const userMsg = await db.saveMessage(
       session.id,
       'coach',
       senderType,
       req.user!.id,
       text.trim(),
-      {},
+      { senderName },
       null,
       nexconnMessageUid || null
     );
 
     let coachReply: any = null;
 
-    // If learner asks coach a question, AI coach answers!
+    // AI Coach ONLY answers questions from the learner. NEVER answer mentor messages!
     if (senderType === 'learner') {
       const scenario = await db.getScenarioById(session.scenario_id);
       if (scenario) {

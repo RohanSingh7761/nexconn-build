@@ -179,6 +179,7 @@ export default function SessionScreen({
             <CoachPanel
               tips={coachMessages}
               onAsk={onAskCoach}
+              isMentor={session?.isMentor}
             />
           </div>
 

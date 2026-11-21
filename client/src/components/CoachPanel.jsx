@@ -3,7 +3,7 @@ import { Bot } from 'lucide-react'
 import TipCard from './TipCard'
 import Composer from './Composer'
 
-export default function CoachPanel({ tips = [], onAsk }) {
+export default function CoachPanel({ tips = [], onAsk, isMentor = false }) {
   const [draft, setDraft] = useState('')
   const bottomRef = useRef(null)
 
@@ -22,8 +22,11 @@ export default function CoachPanel({ tips = [], onAsk }) {
     <section className="coach-panel" aria-label="Coach channel">
       <div className="coach-panel__header">
         <Bot size={15} style={{ color: 'var(--color-cool)', flexShrink: 0 }} aria-hidden="true" />
-        <span className="coach-panel__title">Coach</span>
-        <span className="chip chip--cool" style={{ fontSize: '10px' }}>AI</span>
+        <span className="coach-panel__title">Coach &amp; Mentor</span>
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          <span className="chip chip--cool" style={{ fontSize: '10px' }}>AI</span>
+          <span className="chip chip--mentor" style={{ fontSize: '10px' }}>LIVE</span>
+        </div>
       </div>
 
       <div className="coach-list" role="log" aria-live="polite" aria-label="Coach tips and feedback">
@@ -34,7 +37,9 @@ export default function CoachPanel({ tips = [], onAsk }) {
               <path d="M14 20h12M20 14v12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
             <p className="empty-state__label">
-              The coach will post feedback after your first message in the scene.
+              {isMentor
+                ? 'Type below to share live coaching advice with the learner.'
+                : 'The coach will post feedback after your first message in the scene.'}
             </p>
           </div>
         )}
@@ -50,7 +55,7 @@ export default function CoachPanel({ tips = [], onAsk }) {
         value={draft}
         onChange={setDraft}
         onSend={handleSend}
-        placeholder="Ask the coach a question…"
+        placeholder={isMentor ? 'Give advice to learner…' : 'Ask coach or reply to mentor…'}
         variant="coach"
       />
     </section>

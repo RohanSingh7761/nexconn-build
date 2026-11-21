@@ -53,6 +53,11 @@ function getParam(param: string | string[] | undefined): string {
   return Array.isArray(param) ? param[0] : param;
 }
 
+// The scene is a direct channel with the AI persona, or a group between two humans in partner mode.
+function sceneChannel(session: db.SessionRow) {
+  return { type: session.mode === 'partner' ? 'group' : 'direct', targetId: session.persona_nexconn_id };
+}
+
 // Auth Token Helper
 function createJwt(user: db.UserRow) {
   return jwt.sign(
@@ -242,7 +247,11 @@ app.post('/api/scenarios/custom', requireAuth, async (req: AuthenticatedRequest,
 app.post('/api/sessions', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = req.user!;
-    const { scenarioId, difficulty = 'neutral', userContext } = req.body;
+    const { scenarioId, difficulty = 'neutral', userContext, mode = 'ai' } = req.body;
+    if (mode !== 'ai' && mode !== 'partner') {
+      res.status(400).json({ error: { code: 'BAD_REQUEST', message: "mode must be 'ai' or 'partner'" } });
+      return;
+    }
 
     const scenario = await db.getScenarioById(scenarioId);
     if (!scenario) {
@@ -250,13 +259,25 @@ app.post('/api/sessions', requireAuth, async (req: AuthenticatedRequest, res: Re
       return;
     }
 
-    const personaNexconnId = `persona_${scenario.id}_${Date.now().toString(36)}`;
-    const coachGroupId = `coach_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    const suffix = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    // In partner mode this column holds the scene group id (a human plays the counterpart).
+    const personaNexconnId = mode === 'partner' ? `scene_${suffix}` : `persona_${scenario.id}_${Date.now().toString(36)}`;
+    const coachGroupId = `coach_${suffix}`;
 
-    // 1. Register persona bot on Nexconn
-    await issueToken(personaNexconnId, scenario.persona_name, scenario.persona_avatar_url || undefined).catch((e) =>
-      console.warn('persona register warn:', e.message)
-    );
+    if (mode === 'partner') {
+      // 1a. Scene group: owner now, the partner joins later via invite. bot_coach is a member so it can post the end notice.
+      await createCoachGroup(
+        personaNexconnId,
+        `Scene: ${scenario.title}`,
+        user.nexconnUserId,
+        [user.nexconnUserId, 'bot_coach']
+      ).catch((e) => console.warn('scene group create warn:', e.message));
+    } else {
+      // 1. Register persona bot on Nexconn
+      await issueToken(personaNexconnId, scenario.persona_name, scenario.persona_avatar_url || undefined).catch((e) =>
+        console.warn('persona register warn:', e.message)
+      );
+    }
 
     // 2. Create coach group channel on Nexconn with learner and bot_coach
     await createCoachGroup(
@@ -273,13 +294,14 @@ app.post('/api/sessions', requireAuth, async (req: AuthenticatedRequest, res: Re
       difficulty,
       userContext || null,
       personaNexconnId,
-      coachGroupId
+      coachGroupId,
+      mode
     );
 
     let openingMessage: any = null;
 
-    // 4. Send opening message if scenario has one
-    if (scenario.opening_message) {
+    // 4. Send opening message if scenario has one (AI mode only; in partner mode a human speaks first)
+    if (mode === 'ai' && scenario.opening_message) {
       const delivery = await sendDirectText(
         personaNexconnId,
         user.nexconnUserId,
@@ -301,7 +323,7 @@ app.post('/api/sessions', requireAuth, async (req: AuthenticatedRequest, res: Re
     res.json({
       session,
       channels: {
-        scene: { type: 'direct', targetId: personaNexconnId },
+        scene: sceneChannel(session),
         coach: { type: 'group', targetId: coachGroupId },
       },
       opening: openingMessage,
@@ -328,13 +350,16 @@ app.get('/api/sessions/:id', requireAuth, async (req: AuthenticatedRequest, res:
       return;
     }
     const scenario = await db.getScenarioById(session.scenario_id);
+    const myRole =
+      session.user_id === req.user!.id ? 'learner' : session.partner_user_id === req.user!.id ? 'partner' : 'mentor';
     res.json({
       session,
       scenario,
       channels: {
-        scene: { type: 'direct', targetId: session.persona_nexconn_id },
+        scene: sceneChannel(session),
         coach: { type: 'group', targetId: session.coach_group_id },
       },
+      myRole,
     });
   } catch (err: any) {
     res.status(500).json({ error: { code: 'SERVER_ERROR', message: err.message } });

@@ -50,9 +50,9 @@ export default function InviteSheet({ code = 'AB3K7P', expiresAt, kind = 'mentor
 
         <div
           className="sheet__code"
-          aria-label={`Invite code: ${code ? code.split('').join(' ') : 'Generating...'}`}
+          aria-label={`Invite code: ${code ? code.split('').join(' ') : 'Generating…'}`}
         >
-          {code || 'Generating...'}
+          {code || 'Generating…'}
         </div>
 
         <p className="sheet__note">

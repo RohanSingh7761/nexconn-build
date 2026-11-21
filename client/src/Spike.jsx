@@ -43,7 +43,7 @@ export default function Spike() {
       <input style={field} placeholder="Target user id or group id" value={f.targetId} onChange={set('targetId')} />
       <input style={field} placeholder="Text" value={f.text} onChange={set('text')} />
       <button onClick={send}>Send</button> <button onClick={history}>History</button>
-      <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12, background: '#111', color: '#0f0', padding: 8, minHeight: 200 }}>
+      <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12, background: 'var(--color-paper-3)', color: 'var(--color-ok)', padding: 8, minHeight: 200 }}>
         {log.join('\n')}
       </pre>
     </div>

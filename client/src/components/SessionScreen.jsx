@@ -50,7 +50,7 @@ const DEMO_TIPS = [
     kind: 'coach_tip',
     category: 'tone',
     sentiment: 'strong',
-    text: 'Good — staying calm when challenged. Keep that register.',
+    text: 'Good: staying calm when challenged. Keep that register.',
   },
 ]
 
@@ -255,18 +255,18 @@ export default function SessionScreen({
       {/* Finishing analysis overlay */}
       {session?.isFinishing && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
+          position: 'fixed', inset: 0, background: 'color-mix(in oklch, var(--color-ink) 85%, transparent)',
           zIndex: 9999, display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', gap: 14, color: '#f0f6fc',
+          alignItems: 'center', justifyContent: 'center', gap: 14, color: 'var(--color-ink)',
           fontFamily: 'system-ui, sans-serif'
         }}>
           <div style={{
-            width: 44, height: 44, border: '3px solid #30363d', borderTopColor: '#58a6ff',
+            width: 44, height: 44, border: '3px solid var(--color-rule)', borderTopColor: 'var(--color-accent)',
             borderRadius: '50%', animation: 'spin 1s linear infinite'
           }} />
-          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Evaluating Your Rehearsal...</h3>
-          <p style={{ margin: 0, fontSize: 13, color: '#8b949e' }}>
-            Analyzing conversation transcript and generating your AI scorecard...
+          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Evaluating your session…</h3>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--color-muted)' }}>
+            Analyzing conversation transcript and generating your AI scorecard…
           </p>
         </div>
       )}

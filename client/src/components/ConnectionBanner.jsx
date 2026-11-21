@@ -5,8 +5,8 @@ export default function ConnectionBanner({ status }) {
 
   const label =
     status === 'connecting'      ? 'Reconnecting…'       :
-    status === 'token_expired'   ? 'Session expired — reconnecting…' :
-    'Connection lost — messages will queue and deliver when reconnected.'
+    status === 'token_expired'   ? 'Session expired, reconnecting…' :
+    'Connection lost. Messages queue and deliver when reconnected.'
 
   return (
     <div

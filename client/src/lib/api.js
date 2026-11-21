@@ -81,10 +81,10 @@ export async function createCustomScenario(situation) {
   });
 }
 
-export async function createSession(scenarioId, difficulty = 'neutral', userContext = '') {
+export async function createSession(scenarioId, difficulty = 'neutral', userContext = '', mode = 'ai') {
   return request('/sessions', {
     method: 'POST',
-    body: JSON.stringify({ scenarioId, difficulty, userContext }),
+    body: JSON.stringify({ scenarioId, difficulty, userContext, mode }),
   });
 }
 

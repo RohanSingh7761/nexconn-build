@@ -7,6 +7,7 @@ export default function ScenarioPicker({ user, onStartSession, onJoinInvite, onL
   const [scenarios, setScenarios] = useState([])
   const [selectedId, setSelectedId] = useState('')
   const [difficulty, setDifficulty] = useState('neutral')
+  const [mode, setMode] = useState('ai') // 'ai' = AI plays the other person, 'partner' = a human does
   const [customSituation, setCustomSituation] = useState('')
   const [userContext, setUserContext] = useState('')
   const [inviteCode, setInviteCode] = useState('')
@@ -35,7 +36,7 @@ export default function ScenarioPicker({ user, onStartSession, onJoinInvite, onL
     setLoadingText('Initializing session...')
     setError('')
     try {
-      const res = await api.createSession(selectedId, difficulty, userContext)
+      const res = await api.createSession(selectedId, difficulty, userContext, mode)
       onStartSession(res.session, selectedScenario, res.channels, res.opening)
     } catch (err) {
       setError(err.message)
@@ -74,7 +75,7 @@ export default function ScenarioPicker({ user, onStartSession, onJoinInvite, onL
     setError('')
     try {
       const res = await api.joinInvite(inviteCode.trim())
-      onJoinInvite(res.sessionId, res.coachGroupId)
+      onJoinInvite(res.sessionId, res.coachGroupId, res)
     } catch (err) {
       setError(err.message)
       setLoading(false)
@@ -380,6 +381,38 @@ export default function ScenarioPicker({ user, onStartSession, onJoinInvite, onL
 
                 <div style={{ marginBottom: 16 }}>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#8b949e', marginBottom: 8 }}>
+                    Practice With
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                    {[
+                      { id: 'ai', label: 'AI persona' },
+                      { id: 'partner', label: 'A partner' },
+                    ].map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setMode(m.id)}
+                        style={{
+                          padding: '8px 0', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                          border: mode === m.id ? '1.5px solid #a371f7' : '1px solid #30363d',
+                          background: mode === m.id ? 'rgba(255,255,255,0.06)' : '#0d1117',
+                          color: mode === m.id ? '#bc8cff' : '#8b949e', cursor: 'pointer'
+                        }}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                  {mode === 'partner' && (
+                    <p style={{ margin: '8px 0 0', fontSize: 11, lineHeight: 1.4, color: '#8b949e' }}>
+                      A friend plays the other person. The AI coach only whispers tips to you.
+                    </p>
+                  )}
+                </div>
+
+                {mode === 'ai' && (
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#8b949e', marginBottom: 8 }}>
                     Difficulty Level
                   </label>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
@@ -404,6 +437,7 @@ export default function ScenarioPicker({ user, onStartSession, onJoinInvite, onL
                     ))}
                   </div>
                 </div>
+                )}
 
                 <div style={{ marginBottom: 20 }}>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#8b949e', marginBottom: 6 }}>
@@ -434,7 +468,7 @@ export default function ScenarioPicker({ user, onStartSession, onJoinInvite, onL
                   }}
                 >
                   <Zap size={16} />
-                  {loading ? loadingText : 'Start Rehearsal'}
+                  {loading ? loadingText : mode === 'partner' ? 'Start & Invite Partner' : 'Start Rehearsal'}
                 </button>
               </div>
             </div>

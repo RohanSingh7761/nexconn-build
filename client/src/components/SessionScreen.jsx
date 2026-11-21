@@ -4,6 +4,7 @@ import { MessageSquare, Bot } from 'lucide-react'
 import SessionHeader from './SessionHeader'
 import SceneChat from './SceneChat'
 import CoachPanel from './CoachPanel'
+import RoleCard from './RoleCard'
 import ConnectionBanner from './ConnectionBanner'
 import InviteSheet from './InviteSheet'
 import CoachTipPill from './CoachTipPill'
@@ -63,7 +64,12 @@ export default function SessionScreen({
   onAskCoach,
   onFinish,
   onInvite,
+  onLeave,
 }) {
+  /* partner mode: a human plays the other person and only the interviewee sees the coach */
+  const isPartnerMode = session?.mode === 'partner'
+  const isPartnerSeat = isPartnerMode && session?.myRole === 'partner'
+  const ended         = !!session?.sessionEnded
   /* use demo data if no live session yet */
   const sceneMessages  = session?.sceneMessages  ?? DEMO_SCENE
   const coachMessages  = session?.coachMessages  ?? DEMO_TIPS
@@ -102,6 +108,12 @@ export default function SessionScreen({
     onFinish?.()
   }, [onFinish])
 
+  /* the interviewee gets the partner invite code as soon as a partner session opens */
+  useEffect(() => {
+    if (isPartnerMode && session?.myRole === 'learner') handleInviteClick()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per session, not on every prop change
+  }, [session?.id])
+
   return (
     <>
       <div className="session">
@@ -112,11 +124,27 @@ export default function SessionScreen({
           connectionStatus={connectionStatus}
           startedAt={startedAt}
           isFinishing={session?.isFinishing}
+          mode={session?.mode}
+          myRole={session?.myRole}
           onInvite={handleInviteClick}
           onFinish={handleFinish}
         />
 
         <ConnectionBanner status={connectionStatus} />
+
+        {ended && isPartnerSeat && (
+          <div
+            role="status"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+              padding: '8px var(--space-md)', background: 'var(--color-paper)',
+              borderBottom: '1px solid var(--color-rule)', fontSize: 'var(--text-sm)',
+            }}
+          >
+            <span>The interviewee ended this session.</span>
+            <button type="button" className="btn" onClick={onLeave}>Leave</button>
+          </div>
+        )}
 
         {/* mobile tabs */}
         <nav className="tab-bar" aria-label="Channel tabs">
@@ -144,7 +172,7 @@ export default function SessionScreen({
                 onClick={() => { setActiveTab('coach'); setPillTip(null) }}
               >
                 <Bot size={15} aria-hidden="true" />
-                Coach
+                {isPartnerSeat ? 'Your role' : 'Coach'}
                 {pillTip && activeTab !== 'coach' && (
                   <span className="unread-badge" aria-label="New coach tip">1</span>
                 )}
@@ -166,6 +194,7 @@ export default function SessionScreen({
               pendingTurn={pendingTurn}
               personaName={personaName}
               connectionStatus={connectionStatus}
+              ended={ended}
               onSend={onSendSceneMessage}
             />
           </div>
@@ -177,11 +206,15 @@ export default function SessionScreen({
             className="coach-panel"
             style={activeTab !== 'coach' ? { display: 'none' } : undefined}
           >
-            <CoachPanel
-              tips={coachMessages}
-              onAsk={onAskCoach}
-              isMentor={session?.isMentor}
-            />
+            {isPartnerSeat ? (
+              <RoleCard scenario={scenario} />
+            ) : (
+              <CoachPanel
+                tips={coachMessages}
+                onAsk={onAskCoach}
+                isMentor={session?.isMentor}
+              />
+            )}
           </div>
 
           {/* desktop: always show coach panel (CSS grid handles layout) */}
@@ -207,6 +240,8 @@ export default function SessionScreen({
         <InviteSheet
           code={inviteCode ?? 'AB3K7P'}
           expiresAt={inviteExpiry}
+          kind={isPartnerMode ? 'partner' : 'mentor'}
+          partnerName={isPartnerMode ? personaName : undefined}
           onClose={() => setShowInvite(false)}
         />
       )}

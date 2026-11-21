@@ -11,6 +11,10 @@ export default function Bubble({ message }) {
   // In partner mode both sides are human, so "mine" decides the side; otherwise fall back to the sender type.
   const isLearner = message.isMine ?? message.senderType === 'learner'
 
+  const initials = isLearner
+    ? 'You'
+    : (message.senderName ?? 'AI').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+
   return (
     <div
       className={`bubble-row bubble-row--${isLearner ? 'learner' : 'persona'}`}
@@ -20,10 +24,15 @@ export default function Bubble({ message }) {
         className={`bubble-avatar bubble-avatar--${isLearner ? 'learner' : 'persona'}`}
         aria-hidden="true"
       >
-        {isLearner ? 'You' : (message.senderName ?? 'AI').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+        {initials}
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, alignItems: isLearner ? 'flex-end' : 'flex-start' }}>
+        {!isLearner && message.senderName && (
+          <span className="bubble-sender-name">
+            {message.senderName}
+          </span>
+        )}
         <div className={`bubble bubble--${isLearner ? 'learner' : 'persona'}`}>
           {message.content}
         </div>

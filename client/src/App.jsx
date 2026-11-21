@@ -467,6 +467,14 @@ export default function App() {
       return
     }
 
+    // Incomplete rehearsal confirmation (e.g. just "Hello Sir")
+    if (learnerMsgs.length < 2) {
+      const proceed = window.confirm(
+        'You have only sent 1 message so far.\n\nEnding the rehearsal now will record an incomplete session (low score). Are you sure you want to finish?'
+      )
+      if (!proceed) return
+    }
+
     // Issue #3: Instant visual feedback with loading state
     setIsFinishing(true)
     try {
@@ -551,6 +559,7 @@ export default function App() {
       <SessionScreen
         session={{
           ...session,
+          currentUser: user,
           isMentor: role === 'mentor',
           myRole: role,
           sessionEnded,

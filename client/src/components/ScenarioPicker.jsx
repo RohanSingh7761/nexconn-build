@@ -59,7 +59,7 @@ export default function ScenarioPicker({ user, onStartSession, onJoinInvite, onL
       setLoadingText('Setting up live rehearsal channels...')
 
       // 2. Start session with the custom scenario
-      const res = await api.createSession(customSc.id, difficulty, customSituation.trim())
+      const res = await api.createSession(customSc.id, difficulty, customSituation.trim(), mode)
       onStartSession(res.session, customSc, res.channels, res.opening)
     } catch (err) {
       setError(err.message || 'Could not generate custom scenario.')
@@ -241,34 +241,72 @@ export default function ScenarioPicker({ user, onStartSession, onJoinInvite, onL
             <div style={{ flex: '0 1 320px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
               <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 10, padding: 20 }}>
                 <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 600, color: '#f0f6fc' }}>
-                  Difficulty Level
+                  Practice Settings
                 </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 16 }}>
-                  {[
-                    { id: 'friendly', label: 'Friendly', color: '#3fb950' },
-                    { id: 'neutral', label: 'Neutral', color: '#58a6ff' },
-                    { id: 'tough', label: 'Tough', color: '#f85149' },
-                  ].map((d) => (
-                    <button
-                      key={d.id}
-                      type="button"
-                      onClick={() => setDifficulty(d.id)}
-                      style={{
-                        padding: '10px 0', borderRadius: 6, fontSize: 12, fontWeight: 600,
-                        border: difficulty === d.id ? `1.5px solid ${d.color}` : '1px solid #30363d',
-                        background: difficulty === d.id ? 'rgba(255,255,255,0.06)' : '#0d1117',
-                        color: difficulty === d.id ? d.color : '#8b949e', cursor: 'pointer'
-                      }}
-                    >
-                      {d.label}
-                    </button>
-                  ))}
+
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#8b949e', marginBottom: 8 }}>
+                    Practice With
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                    {[
+                      { id: 'ai', label: 'AI persona' },
+                      { id: 'partner', label: 'A partner' },
+                    ].map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setMode(m.id)}
+                        style={{
+                          padding: '8px 0', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                          border: mode === m.id ? '1.5px solid #a371f7' : '1px solid #30363d',
+                          background: mode === m.id ? 'rgba(255,255,255,0.06)' : '#0d1117',
+                          color: mode === m.id ? '#bc8cff' : '#8b949e', cursor: 'pointer'
+                        }}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <p style={{ margin: 0, fontSize: 12, color: '#8b949e', lineHeight: 1.4 }}>
-                  {difficulty === 'friendly' && 'Persona is receptive, patient, and concedes easily.'}
-                  {difficulty === 'neutral' && 'Persona is realistic, professional, and requires clear reasoning.'}
-                  {difficulty === 'tough' && 'Persona pushes back aggressively, brings objections, and tests composure.'}
-                </p>
+
+                {mode === 'partner' ? (
+                  <p style={{ margin: 0, fontSize: 12, color: '#8b949e', lineHeight: 1.4 }}>
+                    A friend plays the counterpart using an invite code. The AI coach whispers tips to you only.
+                  </p>
+                ) : (
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#8b949e', marginBottom: 8 }}>
+                      Difficulty Level
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+                      {[
+                        { id: 'friendly', label: 'Friendly', color: '#3fb950' },
+                        { id: 'neutral', label: 'Neutral', color: '#58a6ff' },
+                        { id: 'tough', label: 'Tough', color: '#f85149' },
+                      ].map((d) => (
+                        <button
+                          key={d.id}
+                          type="button"
+                          onClick={() => setDifficulty(d.id)}
+                          style={{
+                            padding: '10px 0', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                            border: difficulty === d.id ? `1.5px solid ${d.color}` : '1px solid #30363d',
+                            background: difficulty === d.id ? 'rgba(255,255,255,0.06)' : '#0d1117',
+                            color: difficulty === d.id ? d.color : '#8b949e', cursor: 'pointer'
+                          }}
+                        >
+                          {d.label}
+                        </button>
+                      ))}
+                    </div>
+                    <p style={{ margin: 0, fontSize: 12, color: '#8b949e', lineHeight: 1.4 }}>
+                      {difficulty === 'friendly' && 'Persona is receptive, patient, and concedes easily.'}
+                      {difficulty === 'neutral' && 'Persona is realistic, professional, and requires clear reasoning.'}
+                      {difficulty === 'tough' && 'Persona pushes back aggressively, brings objections, and tests composure.'}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Mentor Invite Box */}

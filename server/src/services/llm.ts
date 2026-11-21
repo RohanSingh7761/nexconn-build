@@ -298,11 +298,26 @@ export async function generateScorecard(
   scenario: ScenarioMeta,
   transcript: Array<{ sender_type: string; content: string }>
 ): Promise<ScorecardResult> {
-  const systemPrompt = `You are a senior executive communication evaluator.
-Evaluate the learner's performance in this conversation:
+  const learnerMsgs = transcript.filter((m) => m.sender_type === 'learner');
+  const learnerWords = learnerMsgs.reduce(
+    (sum, m) => sum + (m.content?.trim().split(/\s+/).filter(Boolean).length || 0),
+    0
+  );
+
+  const systemPrompt = `You are a strict, senior executive communication evaluator.
+Evaluate the learner's actual performance in this conversation:
 Scenario: ${scenario.title} (${scenario.description})
 Learner Objective: ${scenario.learner_objective}
 Rubric criteria: ${JSON.stringify(scenario.rubric)}
+
+CRITICAL EVALUATION RULES:
+1. STRICT FACTUAL ACCURACY: Evaluate ONLY what the learner and counterpart actually typed in the transcript below. NEVER invent or hallucinate topics, objections, or responses that were not in the conversation.
+2. INCOMPLETE CONVERSATIONS: If the learner only exchanged greetings (e.g. "hello", "hi") or failed to state their objective, the overall_score MUST be between 10 and 25, and all dimensions must be scored 1/5 with comments explicitly stating that the objective was never pursued.
+3. RIGOROUS CALIBRATION:
+   - 80-100: Comprehensive persuasion, quantifiable impact, active listening, concrete next steps.
+   - 60-79: Clear ask and intent, but lacked specific metrics or hesitated when challenged.
+   - 35-59: Unclear ask, defensive tone, or abandoned discussion prematurely.
+   - 10-34: Incomplete, trivial greetings only, or minimal participation.
 
 Return JSON ONLY with this schema:
 {
@@ -323,32 +338,50 @@ Return JSON ONLY with this schema:
     .map((m) => `${m.sender_type.toUpperCase()}: ${m.content}`)
     .join('\n');
 
-  const raw = await callLLM({
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: `Here is the full transcript:\n\n${conversationText}` },
-    ],
-    maxTokens: 1200,
-  });
+  let raw = '';
+  try {
+    raw = await callLLM({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Here is the full transcript:\n\n${conversationText}` },
+      ],
+      maxTokens: 1200,
+    });
+  } catch (err) {
+    console.warn('[generateScorecard] LLM evaluation error, using calibrated fallback:', err);
+  }
+
+  // Calibrated dynamic fallback if LLM times out or returns non-JSON:
+  const isShort = learnerMsgs.length < 3 || learnerWords < 25;
+  const fallbackScore = isShort ? 25 : Math.min(70, Math.max(40, learnerMsgs.length * 8 + Math.floor(learnerWords / 4)));
 
   const parsed = parseJSON<ScorecardResult>(raw, {
-    overall_score: 75,
-    summary: 'Solid effort with clear expression of intent. Adding more quantifiable metrics will elevate your persuasion.',
+    overall_score: fallbackScore,
+    summary: isShort
+      ? 'The rehearsal ended before a complete conversation could take place. More turns are needed to demonstrate full persuasion.'
+      : 'Solid effort with clear intent. Incorporating more quantifiable business outcomes and confident framing will elevate your impact.',
     dimensions: scenario.rubric.map((r) => ({
       key: r.key,
       label: r.label,
-      score: 4,
-      comment: 'Addressed well with composure.',
+      score: isShort ? 1 : 3,
+      comment: isShort
+        ? 'Brief exchange provided insufficient evidence to assess this competency.'
+        : 'Demonstrated adequate composure; needs stronger data to substantiate the position.',
     })),
-    strengths: ['Maintained composure under questioning', 'Clear statement of objective'],
-    improvements: ['Include hard metrics or data', 'Prepare answers to budget constraints'],
+    strengths: isShort
+      ? ['Initiated the conversation']
+      : ['Maintained composure under questioning', 'Clear statement of objective'],
+    improvements: [
+      'State specific metrics and quantifiable impact early in the conversation.',
+      'Anticipate budgetary and schedule constraints with concrete proposals.',
+    ],
     key_moments: [
       {
-        what_happened: 'Initial request lacked specific ROI quantification.',
-        better_option: 'State project results in terms of time saved or revenue impacted.',
+        what_happened: 'Discussion was brief or lacked specific ROI quantification.',
+        better_option: 'State project outcomes in terms of time saved or revenue impacted.',
       },
     ],
-    next_practice: 'Practice handling aggressive budget pushback with the Tough difficulty.',
+    next_practice: `Practice "${scenario.title}" with at least 4-5 substantive exchanges.`,
   });
 
   return parsed;

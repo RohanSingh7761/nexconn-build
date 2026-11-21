@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { UserPlus, Square, WifiOff, Loader2 } from 'lucide-react'
+import { UserPlus, Square, WifiOff, Loader2, LogOut, User } from 'lucide-react'
 
 function pad(n) {
   return String(n).padStart(2, '0')
@@ -20,13 +20,19 @@ export default function SessionHeader({
   isFinishing = false,
   mode = 'ai',
   myRole = 'learner',
+  currentUser,
+  ownerName,
+  partnerName,
   onInvite,
   onFinish,
+  onLeave,
 }) {
   const isPartnerMode = mode === 'partner'
   const isPartner = isPartnerMode && myRole === 'partner'
+  const isMentor = myRole === 'mentor'
   const [mountedAt] = useState(Date.now)
   const [now, setNow] = useState(Date.now)
+
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(id)
@@ -46,20 +52,44 @@ export default function SessionHeader({
     tough:    'chip--bad',
   }
 
+  const currentUserName = currentUser?.displayName || currentUser?.username || 'You'
+  const currentUserInitials = currentUserName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+
   return (
     <header className="session-header">
+      {/* Left: Scenario & Counterpart Info */}
       <div className="session-header__persona">
         <div className="persona-avatar" aria-hidden="true">{initials}</div>
-        <div>
-          <div className="persona-name">{personaName}</div>
-          {personaRole && (
-            <div className="measured" style={{ fontSize: '11px' }}>{personaRole}</div>
-          )}
+        <div style={{ minWidth: 0 }}>
+          <div className="persona-name">
+            {isPartner ? `Playing: ${personaName}` : personaName}
+          </div>
+          <div className="measured" style={{ fontSize: '11px', display: 'flex', gap: 6, alignItems: 'center' }}>
+            <span>{personaRole}</span>
+            {isPartner && ownerName && (
+              <span style={{ color: '#c4b5fd' }}>• Partner for {ownerName}</span>
+            )}
+            {isMentor && ownerName && (
+              <span style={{ color: '#bc8cff' }}>• Observing {ownerName}</span>
+            )}
+          </div>
         </div>
+
+        {/* Counterpart / Session Mode Badge */}
         {isPartnerMode ? (
-          <span className="chip chip--cool" style={{ marginLeft: '4px', fontSize: '10px' }}>
-            {isPartner ? 'You play this role' : 'Live partner'}
-          </span>
+          isPartner ? (
+            <span className="chip chip--role" style={{ marginLeft: '4px' }}>
+              YOU PLAY THIS ROLE
+            </span>
+          ) : isMentor ? (
+            <span className="chip chip--mentor" style={{ marginLeft: '4px' }}>
+              MENTOR OBSERVER
+            </span>
+          ) : (
+            <span className="chip chip--live" style={{ marginLeft: '4px' }}>
+              {partnerName ? `Live Partner: ${partnerName}` : 'Live Partner (Waiting…)'}
+            </span>
+          )
         ) : (
           <>
             <span className={`chip ${difficultyMap[difficulty] ?? ''}`} style={{ marginLeft: '4px' }}>
@@ -72,6 +102,7 @@ export default function SessionHeader({
         )}
       </div>
 
+      {/* Right: Controls & Logged-in User Identity */}
       <div className="session-header__controls">
         {connectionStatus !== 'connected' && (
           <span className="chip chip--bad" aria-live="polite" aria-label="Disconnected">
@@ -80,12 +111,26 @@ export default function SessionHeader({
           </span>
         )}
 
+        {/* Top Right: Who YOU are */}
+        <div className="session-user-badge" title={`Signed in as ${currentUserName} (${myRole})`}>
+          <div className={`session-user-badge__avatar session-user-badge__avatar--${myRole}`}>
+            {currentUserInitials}
+          </div>
+          <div className="session-user-badge__meta">
+            <span className="session-user-badge__name">{currentUserName}</span>
+            <span className={`session-user-badge__tag session-user-badge__tag--${myRole}`}>
+              {myRole === 'partner' ? 'PARTNER' : myRole === 'mentor' ? 'MENTOR' : 'LEARNER'}
+            </span>
+          </div>
+        </div>
+
+        {/* Timer */}
         <span className="timer" aria-label={`Elapsed time ${formatElapsed(elapsed)}`}>
           {formatElapsed(elapsed)}
         </span>
 
-        {/* The partner only chats; inviting and ending belong to the interviewee. */}
-        {!isPartner && (
+        {/* Actions based on role */}
+        {!isPartner && !isMentor ? (
           <>
             <button
               type="button"
@@ -119,6 +164,17 @@ export default function SessionHeader({
               )}
             </button>
           </>
+        ) : (
+          <button
+            type="button"
+            className="btn btn--ghost"
+            onClick={onLeave}
+            title="Leave this rehearsal session"
+            style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}
+          >
+            <LogOut size={14} />
+            <span>Leave</span>
+          </button>
         )}
       </div>
     </header>

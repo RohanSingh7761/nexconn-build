@@ -233,6 +233,107 @@ input, textarea {
   flex-shrink: 0;
 }
 
+/* User Identity Badge on Top Right */
+.session-user-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  background: var(--color-paper-3);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-pill);
+  padding: 3px 8px;
+  max-width: 180px;
+}
+
+.session-user-badge__avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-cool-soft);
+  color: var(--color-cool);
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.session-user-badge__avatar--learner {
+  background: color-mix(in oklab, var(--color-accent) 25%, transparent);
+  color: var(--color-accent);
+}
+
+.session-user-badge__avatar--partner {
+  background: color-mix(in oklab, #8b5cf6 25%, transparent);
+  color: #c4b5fd;
+}
+
+.session-user-badge__avatar--mentor {
+  background: color-mix(in oklab, #8b5cf6 25%, transparent);
+  color: #c4b5fd;
+}
+
+.session-user-badge__meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.session-user-badge__name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px;
+  line-height: 1.2;
+}
+
+.session-user-badge__tag {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1;
+}
+
+.session-user-badge__tag--learner {
+  color: var(--color-accent);
+}
+
+.session-user-badge__tag--partner {
+  color: #c4b5fd;
+}
+
+.session-user-badge__tag--mentor {
+  color: #c4b5fd;
+}
+
+.chip--role {
+  background: color-mix(in oklab, #8b5cf6 20%, transparent);
+  color: #c4b5fd;
+  border-color: color-mix(in oklab, #8b5cf6 40%, transparent);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.chip--live {
+  background: color-mix(in oklab, var(--color-ok) 18%, transparent);
+  color: var(--color-ok);
+  border-color: color-mix(in oklab, var(--color-ok) 35%, transparent);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.bubble-sender-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-muted);
+  margin-bottom: 3px;
+  margin-left: 2px;
+}
+
 .timer {
   font-family: var(--font-outlier);
   font-size: var(--text-sm);

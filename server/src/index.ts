@@ -18,6 +18,7 @@ import {
   generateCoachAnswer,
   generateScorecard,
   generateCustomScenario,
+  ScorecardResult,
 } from './services/llm.js';
 import * as db from './db/queries.js';
 
@@ -328,7 +329,11 @@ app.post('/api/sessions', requireAuth, async (req: AuthenticatedRequest, res: Re
     }
 
     res.json({
-      session,
+      session: {
+        ...session,
+        owner_name: user.displayName || user.username || 'Learner',
+        partner_name: null,
+      },
       channels: {
         scene: sceneChannel(session),
         coach: { type: 'group', targetId: coachGroupId },
@@ -360,13 +365,20 @@ app.get('/api/sessions/:id', requireAuth, async (req: AuthenticatedRequest, res:
     const myRole =
       session.user_id === req.user!.id ? 'learner' : session.partner_user_id === req.user!.id ? 'partner' : 'mentor';
     // The persona's hidden goals are only for the human playing them, never the interviewee or a mentor.
+    const ownerUser = await db.getUserById(session.user_id);
+    const partnerUser = session.partner_user_id ? await db.getUserById(session.partner_user_id) : null;
+
     let visibleScenario: Partial<db.ScenarioRow> | null = scenario;
     if (scenario && myRole !== 'partner') {
       const { persona_private_brief, ...rest } = scenario;
       visibleScenario = rest;
     }
     res.json({
-      session,
+      session: {
+        ...session,
+        owner_name: ownerUser?.display_name || ownerUser?.username || 'Learner',
+        partner_name: partnerUser?.display_name || partnerUser?.username || null,
+      },
       scenario: visibleScenario,
       channels: {
         scene: sceneChannel(session),
@@ -638,7 +650,13 @@ app.post('/api/sessions/:id/end', requireAuth, async (req: AuthenticatedRequest,
     const scenario = await db.getScenarioById(session.scenario_id);
     const messages = await db.getSessionMessages(session.id);
 
-    const learnerMessages = messages.filter((m) => m.sender_type === 'learner');
+    const sceneMessages = messages.filter((m) => m.channel === 'scene');
+    const learnerMessages = sceneMessages.filter((m) => m.sender_type === 'learner');
+    const totalLearnerWords = learnerMessages.reduce(
+      (sum, m) => sum + (m.content?.trim().split(/\s+/).filter(Boolean).length || 0),
+      0
+    );
+
     if (learnerMessages.length === 0) {
       res.json({
         session: endedSession,
@@ -650,7 +668,43 @@ app.post('/api/sessions/:id/end', requireAuth, async (req: AuthenticatedRequest,
 
     let scorecard = await db.getScorecard(session.id);
     if (!scorecard && scenario) {
-      const evaluation = await generateScorecard(scenario, messages);
+      let evaluation: ScorecardResult;
+
+      // Issue #2 fix: If the conversation was just greetings (e.g. "Hello Sir") or premature
+      if (learnerMessages.length < 2 || totalLearnerWords < 15) {
+        const isSingleGreeting = totalLearnerWords <= 5;
+        const overallScore = isSingleGreeting ? 15 : 28;
+        const quotes = learnerMessages.map((m) => `"${m.content.trim()}"`).join(', ');
+
+        evaluation = {
+          overall_score: overallScore,
+          summary: `Rehearsal ended prematurely after only ${learnerMessages.length} brief exchange(s) (${quotes}). The conversation never progressed to presenting evidence or addressing the core objective: "${scenario.learner_objective}".`,
+          dimensions: scenario.rubric.map((r: any) => ({
+            key: r.key,
+            label: r.label,
+            score: 1,
+            comment: 'Not demonstrated: session ended before this competency could be exhibited.',
+          })),
+          strengths: isSingleGreeting
+            ? ['Polite opening greeting']
+            : ['Initiated the conversation'],
+          improvements: [
+            'State your primary goal or request immediately after greeting rather than ending the conversation.',
+            'Engage in at least 3 to 5 substantive back-and-forth turns to demonstrate persuasion and listen to pushback.',
+            'Bring specific data points or impact metrics to support your ask.',
+          ],
+          key_moments: [
+            {
+              what_happened: `Conversation was finished immediately after: ${quotes}.`,
+              better_option: `Pivot immediately from greeting to intent: "Thanks for meeting with me. I'd like to discuss my recent project results and compensation."`,
+            },
+          ],
+          next_practice: `Restart "${scenario.title}" and carry out a complete role-play with at least 3-5 exchanges.`,
+        };
+      } else {
+        evaluation = await generateScorecard(scenario, messages);
+      }
+
       scorecard = await db.saveScorecard(
         session.id,
         evaluation.overall_score,

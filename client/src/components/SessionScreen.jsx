@@ -126,8 +126,12 @@ export default function SessionScreen({
           isFinishing={session?.isFinishing}
           mode={session?.mode}
           myRole={session?.myRole}
+          currentUser={session?.currentUser}
+          ownerName={session?.owner_name}
+          partnerName={session?.partner_name}
           onInvite={handleInviteClick}
           onFinish={handleFinish}
+          onLeave={onLeave}
         />
 
         <ConnectionBanner status={connectionStatus} />

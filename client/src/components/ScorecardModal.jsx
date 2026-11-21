@@ -4,7 +4,7 @@ export default function ScorecardModal({ scorecard, scenario, onDone }) {
   if (!scorecard) return null
 
   const {
-    overall_score = 75,
+    overall_score = 0,
     summary = '',
     dimensions = [],
     strengths = [],
@@ -13,6 +13,7 @@ export default function ScorecardModal({ scorecard, scenario, onDone }) {
     next_practice = '',
   } = scorecard
 
+  const isIncomplete = overall_score < 35
   const scoreColor =
     overall_score >= 80 ? '#3fb950' : overall_score >= 60 ? '#d29922' : '#f85149'
 
@@ -26,11 +27,25 @@ export default function ScorecardModal({ scorecard, scenario, onDone }) {
         maxWidth: 680, width: '100%', maxHeight: '90vh', overflowY: 'auto',
         padding: 28, color: '#e6edf3', fontFamily: 'system-ui, -apple-system, sans-serif'
       }}>
+        {/* Incomplete warning banner */}
+        {isIncomplete && (
+          <div style={{
+            background: 'rgba(248, 81, 73, 0.12)', border: '1px solid #f85149',
+            borderRadius: 8, padding: '10px 14px', marginBottom: 16, color: '#ff7b72',
+            fontSize: 13, display: 'flex', alignItems: 'center', gap: 10
+          }}>
+            <AlertCircle size={18} style={{ flexShrink: 0 }} />
+            <span>
+              <strong>Incomplete Rehearsal:</strong> This session was ended prematurely before substantive conversation took place.
+            </span>
+          </div>
+        )}
+
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #21262d', paddingBottom: 16, marginBottom: 20 }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Award size={20} color="#e3b341" />
+              <Award size={20} color={isIncomplete ? '#f85149' : '#e3b341'} />
               <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Performance Scorecard</h2>
             </div>
             <p style={{ margin: '4px 0 0', fontSize: 13, color: '#8b949e' }}>
@@ -51,7 +66,11 @@ export default function ScorecardModal({ scorecard, scenario, onDone }) {
         </div>
 
         {/* Summary */}
-        <div style={{ background: '#0d1117', border: '1px solid #30363d', borderRadius: 8, padding: 14, marginBottom: 20, fontSize: 14, lineHeight: 1.5 }}>
+        <div style={{
+          background: '#0d1117',
+          border: isIncomplete ? '1px solid rgba(248,81,73,0.3)' : '1px solid #30363d',
+          borderRadius: 8, padding: 14, marginBottom: 20, fontSize: 14, lineHeight: 1.5
+        }}>
           {summary}
         </div>
 

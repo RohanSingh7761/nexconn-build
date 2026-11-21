@@ -8,7 +8,8 @@ export default function Bubble({ message }) {
   if (!message || !message.content || !message.content.trim()) {
     return null
   }
-  const isLearner = message.senderType === 'learner'
+  // In partner mode both sides are human, so "mine" decides the side; otherwise fall back to the sender type.
+  const isLearner = message.isMine ?? message.senderType === 'learner'
 
   return (
     <div

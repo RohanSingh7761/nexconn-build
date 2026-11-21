@@ -171,8 +171,8 @@ export default function ScenarioPicker({ user, onStartSession, onJoinInvite, onL
 
         {/* Tab 1: Custom Situation */}
         {tab === 'custom' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24 }}>
-            <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 12, padding: 24 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 24 }}>
+            <div style={{ flex: '1 1 420px', minWidth: 0, background: '#161b22', border: '1px solid #30363d', borderRadius: 12, padding: 24 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <Sparkles size={18} color="#58a6ff" />
                 <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: '#f0f6fc' }}>
@@ -237,7 +237,7 @@ export default function ScenarioPicker({ user, onStartSession, onJoinInvite, onL
             </div>
 
             {/* Right Side Settings */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{ flex: '0 1 320px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
               <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 10, padding: 20 }}>
                 <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 600, color: '#f0f6fc' }}>
                   Difficulty Level
@@ -312,8 +312,8 @@ export default function ScenarioPicker({ user, onStartSession, onJoinInvite, onL
 
         {/* Tab 2: Preset Scenarios */}
         {tab === 'presets' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 24 }}>
-            <div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 24 }}>
+            <div style={{ flex: '1 1 420px', minWidth: 0 }}>
               <h2 style={{ fontSize: 16, fontWeight: 600, margin: '0 0 16px', color: '#f0f6fc' }}>
                 Preset Scenarios
               </h2>
@@ -372,7 +372,7 @@ export default function ScenarioPicker({ user, onStartSession, onJoinInvite, onL
               )}
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{ flex: '0 1 340px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
               <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 10, padding: 20 }}>
                 <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 600, color: '#f0f6fc' }}>
                   Practice Settings

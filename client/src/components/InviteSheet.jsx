@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Copy, X } from 'lucide-react'
 
-export default function InviteSheet({ code = 'AB3K7P', expiresAt, onClose }) {
+export default function InviteSheet({ code = 'AB3K7P', expiresAt, kind = 'mentor', partnerName, onClose }) {
+  const isPartner = kind === 'partner'
+  const title = isPartner ? 'Invite your partner' : 'Invite a mentor'
   const closeRef = useRef(null)
   const [copied, setCopied] = useState(false)
 
@@ -28,13 +30,13 @@ export default function InviteSheet({ code = 'AB3K7P', expiresAt, onClose }) {
       className="sheet-overlay"
       role="dialog"
       aria-modal="true"
-      aria-label="Invite a mentor"
+      aria-label={title}
       onClick={handleOverlayClick}
       onKeyDown={handleKey}
     >
       <div className="sheet">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h2 className="sheet__title">Invite a mentor</h2>
+          <h2 className="sheet__title">{title}</h2>
           <button
             ref={closeRef}
             type="button"
@@ -54,7 +56,9 @@ export default function InviteSheet({ code = 'AB3K7P', expiresAt, onClose }) {
         </div>
 
         <p className="sheet__note">
-          Share this code with your mentor. They can enter it on the join page to access the coach channel alongside this session.
+          {isPartner
+            ? `Share this code with a friend. They enter it on the join page to chat with you live${partnerName ? ` as ${partnerName}` : ''}. The AI coach only whispers to you.`
+            : 'Share this code with your mentor. They can enter it on the join page to access the coach channel alongside this session.'}
           {(() => {
             if (!expiresAt) return null;
             try {

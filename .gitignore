@@ -35,3 +35,6 @@ dist-ssr
 *.crt
 *.cer
 secrets.local.*
+
+# Demo video assets
+demo-video/

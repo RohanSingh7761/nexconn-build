@@ -4,6 +4,26 @@ Practice hard conversations in chat before having them for real. An AI plays the
 
 ---
 
+## Demo
+
+[![Watch the DryRun demo (1 min 27 s)](docs/screenshots/session-coach.jpg)](docs/demo.mp4)
+
+▶ **[Watch the demo video](docs/demo.mp4)** (1 min 27 s, with narration)
+
+---
+
+## Screenshots
+
+| Dashboard | Scenario picker |
+| :---: | :---: |
+| ![Dashboard with the coach example and scenario list](docs/screenshots/dashboard.jpg) | ![Preset scenarios with partner and difficulty settings](docs/screenshots/scenarios.jpg) |
+| **Live session with private coach tips** | **Scorecard** |
+| ![Chat with the AI manager beside the coach panel](docs/screenshots/session-coach.jpg) | ![Performance scorecard with rubric ratings](docs/screenshots/scorecard.jpg) |
+| **Invite a partner** | **Progress** |
+| ![Invite code dialog for a human practice partner](docs/screenshots/partner-invite.jpg) | ![Signed-in dashboard with session stats](docs/screenshots/progress.jpg) |
+
+---
+
 ## Project Structure
 
 ```text
@@ -86,7 +106,7 @@ This automated command:
 ## 3. Configuration (`.env`)
 
 ### Server (`server/.env`)
-The server environment is pre-configured with the project's Nexconn App Key and Secret:
+Copy `server/.env.example` to `server/.env` and fill in your own Nexconn App Secret from the Nexconn console. Never commit it.
 ```env
 PORT=4000
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/rehearsal
@@ -94,7 +114,7 @@ JWT_SECRET=change-me-to-a-secure-secret-key-in-production
 CORS_ORIGINS=http://localhost:5173,https://localhost
 
 NEXCONN_APP_KEY=6tnym1br6ia37
-NEXCONN_APP_SECRET=y39k0InBtQUZ
+NEXCONN_APP_SECRET=your_nexconn_app_secret_here
 # Singapore Region API endpoints (matching App Key data center):
 NEXCONN_PRIMARY_API_DOMAIN=api.sg-light-api.com
 NEXCONN_SECONDARY_API_DOMAIN=api-b.sg-light-api.com
